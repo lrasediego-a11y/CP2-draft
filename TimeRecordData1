@@ -1,0 +1,57 @@
+public class TimeRecordData {
+    private static String[] employeeIdRecords = {
+            "10001", "10001",
+            "10002", "10002",
+            "10003", "10003"
+    };
+
+    private static String[] dateRecords = {
+            "2026-05-18", "2026-05-19",
+            "2026-05-18", "2026-05-19",
+            "2026-05-18", "2026-05-19"
+    };
+
+    private static double[] hoursWorkedRecords = {
+            8.0, 7.5,
+            8.0, 8.0,
+            7.0, 8.0
+    };
+
+    public static double getHoursWorked(String employeeId) {
+        double totalHours = 0.00;
+
+        for (int index = 0; index < employeeIdRecords.length; index++) {
+            if (employeeIdRecords[index].equals(employeeId)) {
+                totalHours += hoursWorkedRecords[index];
+            }
+        }
+
+        System.out.println("Total hours worked: " + totalHours);
+        return totalHours;
+    }
+
+    public static double computeHoursWorked(double timeIn, double timeOut) {
+        if (timeOut < timeIn) {
+            return 0.00;
+        }
+
+        return timeOut - timeIn;
+    }
+
+    public static String getAttendanceSummary(String employeeId) {
+        String summary = "";
+
+        for (int index = 0; index < employeeIdRecords.length; index++) {
+            if (employeeIdRecords[index].equals(employeeId)) {
+                summary += dateRecords[index] + " - "
+                        + hoursWorkedRecords[index] + " hours\n";
+            }
+        }
+
+        if (summary.equals("")) {
+            return "No time records found.";
+        }
+
+        return summary;
+    }
+}
