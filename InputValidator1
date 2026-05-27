@@ -1,0 +1,42 @@
+public class InputValidator {
+    private static String errorMessage = "";
+    private static String[] validEmployeeIds = EmployeeData.getEmployeeIds();
+    private static String[] numericFields = {};
+
+    public static boolean validateRequiredFields(String employeeId) {
+        if (employeeId == null || employeeId.trim().equals("")) {
+            errorMessage = "Employee ID is required. Please enter an employee ID.";
+            return false;
+        }
+
+        errorMessage = "";
+        return true;
+    }
+
+    public static boolean validateNumericInput(String value) {
+        try {
+            Double.parseDouble(value);
+            errorMessage = "";
+            return true;
+        } catch (NumberFormatException exception) {
+            errorMessage = "Invalid number. Please enter numeric values only.";
+            return false;
+        }
+    }
+
+    public static boolean validateEmployeeId(String employeeId) {
+        for (int index = 0; index < validEmployeeIds.length; index++) {
+            if (validEmployeeIds[index].equals(employeeId)) {
+                errorMessage = "";
+                return true;
+            }
+        }
+
+        errorMessage = "Employee ID was not found. Try 10001, 10002, or 10003.";
+        return false;
+    }
+
+    public static String getErrorMessage() {
+        return errorMessage;
+    }
+}
