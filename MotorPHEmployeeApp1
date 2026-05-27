@@ -1,0 +1,102 @@
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
+
+public class MotorPHEmployeeApp {
+    private static JTextField employeeIdField;
+    private static JButton computeButton;
+    private static JTextArea resultArea;
+
+    public static void main(String[] args) {
+        System.out.println("MotorPH Employee App is starting...");
+        SwingUtilities.invokeLater(MotorPHEmployeeApp::setupGUI);
+    }
+
+    public static void setupGUI() {
+        JFrame frame = new JFrame("MotorPH Employee App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(620, 430);
+        frame.setLocationRelativeTo(null);
+
+        JLabel titleLabel = new JLabel("MotorPH Employee Payroll", JLabel.CENTER);
+        JLabel instructionLabel = new JLabel("Enter Employee ID:");
+
+        employeeIdField = new JTextField();
+        computeButton = new JButton("Compute Payroll");
+        resultArea = new JTextArea(12, 45);
+        resultArea.setEditable(false);
+        resultArea.setLineWrap(true);
+        resultArea.setWrapStyleWord(true);
+
+        JPanel inputPanel = new JPanel(new GridLayout(2, 2, 8, 8));
+        inputPanel.add(instructionLabel);
+        inputPanel.add(employeeIdField);
+        inputPanel.add(new JLabel(""));
+        inputPanel.add(computeButton);
+
+        frame.add(titleLabel, BorderLayout.NORTH);
+        frame.add(inputPanel, BorderLayout.CENTER);
+        frame.add(new JScrollPane(resultArea), BorderLayout.SOUTH);
+
+        computeButton.addActionListener(event -> handleComputeButton());
+
+        resultArea.setText("Sample Employee IDs: 10001, 10002, 10003");
+        frame.setVisible(true);
+    }
+
+    private static void handleComputeButton() {
+        String employeeId = employeeIdField.getText().trim();
+        System.out.println("Compute button clicked.");
+
+        if (!InputValidator.validateRequiredFields(employeeId)) {
+            resultArea.setText(InputValidator.getErrorMessage());
+            displayResult();
+            return;
+        }
+
+        if (!InputValidator.validateEmployeeId(employeeId)) {
+            resultArea.setText(InputValidator.getErrorMessage());
+            displayResult();
+            return;
+        }
+
+        int employeeIndex = EmployeeData.findEmployeeIndex(employeeId);
+        String employeeName = EmployeeData.getEmployeeName(employeeIndex);
+        double basicSalary = EmployeeData.getBasicSalary(employeeIndex);
+        double hourlyRate = EmployeeData.getHourlyRate(employeeIndex);
+        double hoursWorked = TimeRecordData.getHoursWorked(employeeId);
+        double grossPay = PayrollCalculator.computeGrossPay(hourlyRate, hoursWorked);
+        double deductions = PayrollCalculator.computeDeductions(grossPay, basicSalary);
+        double netPay = PayrollCalculator.computeNetPay(grossPay, deductions);
+
+        String output = "Employee ID: " + employeeId
+                + "\nEmployee Name: " + employeeName
+                + "\nBasic Salary: PHP " + String.format("%.2f", basicSalary)
+                + "\nHourly Rate: PHP " + String.format("%.2f", hourlyRate)
+                + "\nHours Worked: " + String.format("%.2f", hoursWorked)
+                + "\n\nGross Pay: PHP " + String.format("%.2f", grossPay)
+                + "\n\nDeductions from CP1 MotorPH Formula:"
+                + "\nSSS: PHP " + String.format("%.2f", PayrollCalculator.getSSSContribution())
+                + "\nPhilHealth: PHP " + String.format("%.2f", PayrollCalculator.getPhilHealthContribution())
+                + "\nPag-IBIG: PHP " + String.format("%.2f", PayrollCalculator.getPagIbigContribution())
+                + "\nWithholding Tax: PHP " + String.format("%.2f", PayrollCalculator.getWithholdingTax())
+                + "\nTotal Deductions: PHP " + String.format("%.2f", deductions)
+                + "\nNet Pay: PHP " + String.format("%.2f", netPay)
+                + "\n\nAttendance Summary:\n" + TimeRecordData.getAttendanceSummary(employeeId);
+
+        resultArea.setText(output);
+        displayResult();
+    }
+
+    private static void displayResult() {
+        System.out.println("Current output:");
+        System.out.println(resultArea.getText());
+    }
+}
