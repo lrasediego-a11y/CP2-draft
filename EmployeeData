@@ -1,0 +1,46 @@
+public class EmployeeData {
+    private static String[] employeeIds = {"10001", "10002", "10003"};
+    private static String[] employeeNames = {"Jose Garcia", "Maria Santos", "Anthony Sediego"};
+    private static double[] basicSalaries = {90000.00, 82500.00, 97500.00};
+    private static double[] hourlyRates = {535.71, 491.07, 580.36};
+
+    public static int findEmployeeIndex(String employeeId) {
+        for (int index = 0; index < employeeIds.length; index++) {
+            if (employeeIds[index].equals(employeeId)) {
+                System.out.println("Employee found at index " + index);
+                return index;
+            }
+        }
+
+        System.out.println("Employee was not found.");
+        return -1;
+    }
+
+    public static String getEmployeeName(int employeeIndex) {
+        if (employeeIndex >= 0 && employeeIndex < employeeNames.length) {
+            return employeeNames[employeeIndex];
+        }
+
+        return "Unknown Employee";
+    }
+
+    public static double getHourlyRate(int employeeIndex) {
+        if (employeeIndex >= 0 && employeeIndex < hourlyRates.length) {
+            return hourlyRates[employeeIndex];
+        }
+
+        return 0.00;
+    }
+
+    public static double getBasicSalary(int employeeIndex) {
+        if (employeeIndex >= 0 && employeeIndex < basicSalaries.length) {
+            return basicSalaries[employeeIndex];
+        }
+
+        return 0.00;
+    }
+
+    public static String[] getEmployeeIds() {
+        return employeeIds;
+    }
+}
