@@ -1,3 +1,11 @@
+Reflection: Managing Cafe Orders with Collections
+
+ArrayList simplifies updating and deleting records compared to arrays because its size can change while the program is running. With arrays, the size is fixed, so adding or deleting items would require creating a new array and copying values. With ArrayList, the program can directly use add() and remove().
+
+HashSet helps ensure data accuracy by preventing duplicate menu items. Before adding a new item, the program checks the HashSet to see if the item already exists. This keeps the menu cleaner and avoids repeated entries.
+
+The cafe methods that directly correspond to MotorPH employee management tasks are loadMenu(), addMenuItem(), deleteMenuItem(), saveMenuToCSV(), and displayMenu(). These are similar to loading employee records, adding employees, deleting employees, saving employee updates, and displaying records in the MotorPH Employee App.
+
 The saveMenuToCSV() logic can be reused for employee data by writing each updated employee record back into a CSV file. The same pattern applies: store records in a collection, update the collection in memory, then rewrite the CSV so the changes are saved permanently.
 
 In my program, the responsibilities are separated into smaller methods. Validation is handled before adding or deleting. Collection updates are handled by addMenuItem() and deleteMenuItem(). Persistence is handled by saveMenuToCSV(). Display is handled by displayMenu(). This makes the code easier to maintain and extend later.
