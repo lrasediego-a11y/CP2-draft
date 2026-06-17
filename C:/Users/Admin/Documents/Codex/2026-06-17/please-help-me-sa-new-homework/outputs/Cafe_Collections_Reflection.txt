@@ -1,0 +1,3 @@
+The saveMenuToCSV() logic can be reused for employee data by writing each updated employee record back into a CSV file. The same pattern applies: store records in a collection, update the collection in memory, then rewrite the CSV so the changes are saved permanently.
+
+In my program, the responsibilities are separated into smaller methods. Validation is handled before adding or deleting. Collection updates are handled by addMenuItem() and deleteMenuItem(). Persistence is handled by saveMenuToCSV(). Display is handled by displayMenu(). This makes the code easier to maintain and extend later.
