@@ -1,102 +1,656 @@
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.SwingUtilities;
-import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import java.awt.*;
 
+/**
+ * MotorPHEmployeeApp
+ *
+ * Main entry point and GUI controller for the MotorPH Employee App.
+ * Implements MPHCR01 – Feature 1: Graphical User Interface with
+ * Employee Number, Employee Name, and Pay Coverage input fields.
+ *
+ * Architecture (MVC-like):
+ *   View    — Swing components built via UIComponentFactory
+ *   Model   — EmployeeData, TimeRecordData, PayrollCalculator
+ *   Control — handleXxx() event handler methods in this class
+ *
+ * All magic numbers/strings come from AppConstants.
+ * All component creation goes through UIComponentFactory (Factory pattern).
+ * All report text is built by PayrollReportBuilder (single responsibility).
+ */
 public class MotorPHEmployeeApp {
-    private static JTextField employeeIdField;
-    private static JButton computeButton;
-    private static JTextArea resultArea;
 
-    public static void main(String[] args) {
-        System.out.println("MotorPH Employee App is starting...");
-        SwingUtilities.invokeLater(MotorPHEmployeeApp::setupGUI);
+  // ── CR01/CR03 — Payroll Tab ─────────────────────────────────────────────────
+  private static JTextField payrollEmployeeIdField;
+  private static JTextField payCoverageStartField;
+  private static JTextField payCoverageEndField;
+  private static JButton    computePayrollButton;
+  private static JTextArea  payrollResultArea;
+
+  // ── CR02 — View/Add Tab ─────────────────────────────────────────────────────
+  private static JTextArea  allEmployeesDisplayArea;
+  private static JTextField addEmployeeIdField;
+  private static JTextField addEmployeeNameField;
+  private static JTextField addBasicSalaryField;
+  private static JTextField addHourlyRateField;
+  private static JButton    addEmployeeButton;
+
+  // ── CR04 — Update/Delete Tab ────────────────────────────────────────────────
+  private static JTextField searchEmployeeIdField;
+  private static JTextField updateEmployeeNameField;
+  private static JTextField updateBasicSalaryField;
+  private static JTextField updateHourlyRateField;
+  private static JButton    saveChangesButton;
+  private static JButton    deleteEmployeeButton;
+  private static JTextArea  updateStatusArea;
+
+  // ── CR05 — Summary Tab ──────────────────────────────────────────────────────
+  private static JTextArea payrollSummaryArea;
+
+  // ────────────────────────────────────────────────────────────────────────────
+
+  public static void main(String[] args) {
+    SwingUtilities.invokeLater(MotorPHEmployeeApp::initializeAndDisplayGui);
+  }
+
+  /** Initializes the main window, builds all tabs, then makes it visible. */
+  public static void initializeAndDisplayGui() {
+    applySystemLookAndFeel();
+
+    JFrame mainFrame = new JFrame(AppConstants.APP_TITLE);
+    mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    mainFrame.setSize(AppConstants.WINDOW_WIDTH, AppConstants.WINDOW_HEIGHT);
+    mainFrame.setLocationRelativeTo(null);
+
+    JTabbedPane navigationTabs = new JTabbedPane();
+    navigationTabs.setFont(AppConstants.FONT_LABEL);
+    navigationTabs.addTab(AppConstants.TAB_PAYROLL,       buildPayrollTab());
+    navigationTabs.addTab(AppConstants.TAB_VIEW_ADD,      buildViewAddTab());
+    navigationTabs.addTab(AppConstants.TAB_UPDATE_DELETE, buildUpdateDeleteTab());
+    navigationTabs.addTab(AppConstants.TAB_SUMMARY,       buildSummaryTab());
+
+    mainFrame.add(UIComponentFactory.createAppHeaderBanner(), BorderLayout.NORTH);
+    mainFrame.add(navigationTabs, BorderLayout.CENTER);
+    mainFrame.setVisible(true);
+  }
+
+  // ── Tab Builders ─────────────────────────────────────────────────────────────
+
+  /**
+   * CR01 + CR03 — Payroll computation tab.
+   * Required inputs: Employee Number, Employee Name (auto-displayed), Pay Coverage.
+   */
+  private static JPanel buildPayrollTab() {
+    JPanel outerPanel = createTabOuterPanel();
+
+    // ── Input section ──
+    JPanel inputSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_COMPUTE_PAYROLL);
+
+    payrollEmployeeIdField = UIComponentFactory.createStyledTextField(14);
+    payCoverageStartField  = UIComponentFactory.createStyledTextField(12);
+    payCoverageEndField    = UIComponentFactory.createStyledTextField(12);
+    computePayrollButton   = UIComponentFactory.createPrimaryButton(
+        AppConstants.BUTTON_COMPUTE_PAYROLL);
+    JButton resetPayrollButton = UIComponentFactory.createSecondaryButton(
+        AppConstants.BUTTON_RESET);
+    computePayrollButton.setEnabled(false); // error prevention: disabled until all fields filled
+
+    // Row 1: Employee Number
+    JPanel employeeIdRow = createFlowRow();
+    employeeIdRow.add(UIComponentFactory.createFieldLabel(AppConstants.LABEL_EMPLOYEE_ID));
+    employeeIdRow.add(payrollEmployeeIdField);
+
+    // Row 2: Pay Coverage
+    JPanel payCoverageRow = createFlowRow();
+    payCoverageRow.add(UIComponentFactory.createFieldLabel(
+        AppConstants.LABEL_PAY_PERIOD_START));
+    payCoverageRow.add(payCoverageStartField);
+    payCoverageRow.add(Box.createHorizontalStrut(12));
+    payCoverageRow.add(UIComponentFactory.createFieldLabel(
+        AppConstants.LABEL_PAY_PERIOD_END));
+    payCoverageRow.add(payCoverageEndField);
+
+    // Row 3: Buttons
+    JPanel buttonRow = createFlowRow();
+    buttonRow.add(computePayrollButton);
+    buttonRow.add(resetPayrollButton);
+
+    inputSection.add(employeeIdRow);
+    inputSection.add(Box.createVerticalStrut(6));
+    inputSection.add(payCoverageRow);
+    inputSection.add(Box.createVerticalStrut(4));
+    inputSection.add(buttonRow);
+    inputSection.add(Box.createVerticalStrut(2));
+    inputSection.add(UIComponentFactory.createHintLabel(AppConstants.HINT_AVAILABLE_IDS));
+    inputSection.add(UIComponentFactory.createHintLabel(AppConstants.HINT_DATE_FORMAT));
+
+    // ── Result section ──
+    JPanel resultSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_PAYROLL_RESULT);
+    payrollResultArea = UIComponentFactory.createReadOnlyResultArea(
+        AppConstants.RESULT_AREA_ROWS);
+    payrollResultArea.setText(AppConstants.HINT_PAYROLL_INITIAL);
+    resultSection.add(new JScrollPane(payrollResultArea));
+
+    outerPanel.add(inputSection,  BorderLayout.NORTH);
+    outerPanel.add(resultSection, BorderLayout.CENTER);
+
+    // Events — enable Compute only when all 3 fields are filled
+    DocumentListener allPayrollFieldsListener = buildAllFieldsRequiredListener(
+        computePayrollButton,
+        payrollEmployeeIdField, payCoverageStartField, payCoverageEndField);
+    payrollEmployeeIdField.getDocument().addDocumentListener(allPayrollFieldsListener);
+    payCoverageStartField.getDocument().addDocumentListener(allPayrollFieldsListener);
+    payCoverageEndField.getDocument().addDocumentListener(allPayrollFieldsListener);
+
+    computePayrollButton.addActionListener(e -> handleComputePayroll());
+    resetPayrollButton.addActionListener(e -> clearPayrollTab());
+    payrollEmployeeIdField.addActionListener(e -> {
+      if (computePayrollButton.isEnabled()) handleComputePayroll();
+    });
+
+    return outerPanel;
+  }
+
+  /** CR02 — View all employees and add new employee tab. */
+  private static JPanel buildViewAddTab() {
+    JPanel outerPanel = createTabOuterPanel();
+
+    // ── View section ──
+    JPanel viewSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_EMPLOYEE_RECORDS);
+    allEmployeesDisplayArea = UIComponentFactory.createReadOnlyResultArea(
+        AppConstants.VIEW_AREA_ROWS);
+    refreshAllEmployeesDisplay();
+
+    JButton refreshListButton = UIComponentFactory.createSecondaryButton(
+        AppConstants.BUTTON_REFRESH_LIST);
+    refreshListButton.addActionListener(e -> refreshAllEmployeesDisplay());
+
+    JPanel refreshRow = createFlowRow();
+    refreshRow.add(refreshListButton);
+
+    viewSection.add(new JScrollPane(allEmployeesDisplayArea));
+    viewSection.add(refreshRow);
+
+    // ── Add section ──
+    JPanel addSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_ADD_EMPLOYEE);
+
+    addEmployeeIdField   = UIComponentFactory.createStyledTextField(15);
+    addEmployeeNameField = UIComponentFactory.createStyledTextField(20);
+    addBasicSalaryField  = UIComponentFactory.createStyledTextField(12);
+    addHourlyRateField   = UIComponentFactory.createStyledTextField(12);
+    addEmployeeButton    = UIComponentFactory.createPrimaryButton(
+        AppConstants.BUTTON_ADD_EMPLOYEE);
+    JButton clearAddFieldsButton = UIComponentFactory.createSecondaryButton(
+        AppConstants.BUTTON_CLEAR_FIELDS);
+    addEmployeeButton.setEnabled(false); // error prevention: all fields required
+
+    JPanel addFormGrid = new JPanel(new GridLayout(4, 1, 0, AppConstants.SPACING_FIELD_GAP));
+    addFormGrid.setBackground(AppConstants.COLOR_SURFACE);
+    addFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_EMPLOYEE_ID,   addEmployeeIdField));
+    addFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_EMPLOYEE_NAME, addEmployeeNameField));
+    addFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_BASIC_SALARY,  addBasicSalaryField));
+    addFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_HOURLY_RATE,   addHourlyRateField));
+
+    JPanel addButtonRow = createFlowRow();
+    addButtonRow.add(addEmployeeButton);
+    addButtonRow.add(clearAddFieldsButton);
+
+    addSection.add(addFormGrid);
+    addSection.add(addButtonRow);
+
+    outerPanel.add(viewSection, BorderLayout.CENTER);
+    outerPanel.add(addSection,  BorderLayout.SOUTH);
+
+    // Events — enable Add only when all 4 fields filled
+    DocumentListener allAddFieldsListener = buildAllFieldsRequiredListener(
+        addEmployeeButton,
+        addEmployeeIdField, addEmployeeNameField,
+        addBasicSalaryField, addHourlyRateField);
+    addEmployeeIdField.getDocument().addDocumentListener(allAddFieldsListener);
+    addEmployeeNameField.getDocument().addDocumentListener(allAddFieldsListener);
+    addBasicSalaryField.getDocument().addDocumentListener(allAddFieldsListener);
+    addHourlyRateField.getDocument().addDocumentListener(allAddFieldsListener);
+
+    addEmployeeButton.addActionListener(e -> handleAddNewEmployee());
+    clearAddFieldsButton.addActionListener(e -> clearAddEmployeeFields());
+
+    return outerPanel;
+  }
+
+  /** CR04 — Update and delete employee records tab. */
+  private static JPanel buildUpdateDeleteTab() {
+    JPanel outerPanel = createTabOuterPanel();
+
+    // ── Search section ──
+    JPanel searchSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_FIND_EMPLOYEE);
+    searchEmployeeIdField = UIComponentFactory.createStyledTextField(15);
+    JButton loadEmployeeButton = UIComponentFactory.createPrimaryButton(
+        AppConstants.BUTTON_LOAD_EMPLOYEE);
+
+    JPanel searchRow = createFlowRow();
+    searchRow.add(UIComponentFactory.createFieldLabel(AppConstants.LABEL_EMPLOYEE_ID));
+    searchRow.add(searchEmployeeIdField);
+    searchRow.add(loadEmployeeButton);
+    searchSection.add(searchRow);
+
+    // ── Edit section ──
+    JPanel editSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_EDIT_DETAILS);
+
+    updateEmployeeNameField = UIComponentFactory.createStyledTextField(20);
+    updateBasicSalaryField  = UIComponentFactory.createStyledTextField(12);
+    updateHourlyRateField   = UIComponentFactory.createStyledTextField(12);
+    disableEditFields();
+
+    JPanel editFormGrid = new JPanel(new GridLayout(3, 1, 0, AppConstants.SPACING_FIELD_GAP));
+    editFormGrid.setBackground(AppConstants.COLOR_SURFACE);
+    editFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_EMPLOYEE_NAME, updateEmployeeNameField));
+    editFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_BASIC_SALARY,  updateBasicSalaryField));
+    editFormGrid.add(UIComponentFactory.createLabeledFieldRow(
+        AppConstants.LABEL_HOURLY_RATE,   updateHourlyRateField));
+
+    saveChangesButton    = UIComponentFactory.createPrimaryButton(
+        AppConstants.BUTTON_SAVE_CHANGES);
+    deleteEmployeeButton = UIComponentFactory.createDangerButton(
+        AppConstants.BUTTON_DELETE_EMPLOYEE);
+    saveChangesButton.setEnabled(false);
+    deleteEmployeeButton.setEnabled(false);
+
+    JPanel editButtonRow = createFlowRow();
+    editButtonRow.add(saveChangesButton);
+    editButtonRow.add(deleteEmployeeButton);
+
+    editSection.add(editFormGrid);
+    editSection.add(editButtonRow);
+
+    // ── Status section ──
+    JPanel statusSection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_STATUS);
+    updateStatusArea = UIComponentFactory.createReadOnlyResultArea(
+        AppConstants.STATUS_AREA_ROWS);
+    updateStatusArea.setText(AppConstants.HINT_UPDATE_INITIAL);
+    statusSection.add(new JScrollPane(updateStatusArea));
+
+    outerPanel.add(searchSection, BorderLayout.NORTH);
+    outerPanel.add(editSection,   BorderLayout.CENTER);
+    outerPanel.add(statusSection, BorderLayout.SOUTH);
+
+    loadEmployeeButton.addActionListener(e -> handleLoadEmployeeForEditing());
+    saveChangesButton.addActionListener(e -> handleSaveEmployeeChanges());
+    deleteEmployeeButton.addActionListener(e -> handleDeleteEmployee());
+    searchEmployeeIdField.addActionListener(e -> handleLoadEmployeeForEditing());
+
+    return outerPanel;
+  }
+
+  /** CR05 — Payroll summary tab. */
+  private static JPanel buildSummaryTab() {
+    JPanel outerPanel = createTabOuterPanel();
+
+    JPanel summarySection = UIComponentFactory.createSectionPanel(
+        AppConstants.SECTION_SUMMARY);
+    payrollSummaryArea = UIComponentFactory.createReadOnlyResultArea(
+        AppConstants.SUMMARY_AREA_ROWS);
+    payrollSummaryArea.setText(AppConstants.HINT_SUMMARY_INITIAL);
+    summarySection.add(new JScrollPane(payrollSummaryArea));
+
+    JButton generateSummaryButton = UIComponentFactory.createPrimaryButton(
+        AppConstants.BUTTON_GENERATE_SUMMARY);
+    generateSummaryButton.addActionListener(e -> handleGeneratePayrollSummary());
+
+    JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 6));
+    buttonRow.setBackground(AppConstants.COLOR_BACKGROUND);
+    buttonRow.add(generateSummaryButton);
+
+    outerPanel.add(summarySection, BorderLayout.CENTER);
+    outerPanel.add(buttonRow,      BorderLayout.SOUTH);
+
+    return outerPanel;
+  }
+
+  // ── Event Handlers ────────────────────────────────────────────────────────────
+
+  /** Validates input, computes payroll for the entered pay coverage period, displays result. */
+  private static void handleComputePayroll() {
+    String enteredEmployeeId   = payrollEmployeeIdField.getText().trim();
+    String enteredStartDate    = payCoverageStartField.getText().trim();
+    String enteredEndDate      = payCoverageEndField.getText().trim();
+
+    try {
+      if (!InputValidator.validatePayrollInputFields(
+          enteredEmployeeId, enteredStartDate, enteredEndDate)) {
+        throw new IllegalArgumentException(InputValidator.getLastValidationError());
+      }
+
+      int    employeeIndex   = EmployeeData.findEmployeeIndexById(enteredEmployeeId);
+      String employeeName    = EmployeeData.getEmployeeNameByIndex(employeeIndex);
+      double basicSalary     = EmployeeData.getBasicSalaryByIndex(employeeIndex);
+      double hourlyRate      = EmployeeData.getHourlyRateByIndex(employeeIndex);
+      double hoursWorked     = TimeRecordData.computeHoursWorkedInPayPeriod(
+          enteredEmployeeId, enteredStartDate, enteredEndDate);
+      double grossPay        = PayrollCalculator.computeGrossPay(hourlyRate, hoursWorked);
+      double totalDeductions = PayrollCalculator.computeAllDeductions(grossPay, basicSalary);
+      double netPay          = PayrollCalculator.computeNetPay(grossPay, totalDeductions);
+      String attendanceSummary = TimeRecordData.buildAttendanceSummaryForPayPeriod(
+          enteredEmployeeId, enteredStartDate, enteredEndDate);
+
+      String formattedReport = PayrollReportBuilder.buildIndividualPayrollReport(
+          enteredEmployeeId, employeeName,
+          enteredStartDate, enteredEndDate,
+          basicSalary, hourlyRate, hoursWorked,
+          grossPay,
+          PayrollCalculator.getLastSssContribution(),
+          PayrollCalculator.getLastPhilHealthContribution(),
+          PayrollCalculator.getLastPagIbigContribution(),
+          PayrollCalculator.getLastWithholdingTax(),
+          totalDeductions, netPay, attendanceSummary);
+
+      payrollResultArea.setText(formattedReport);
+
+    } catch (IllegalArgumentException validationException) {
+      showWarningDialog(validationException.getMessage(), AppConstants.DIALOG_INPUT_ERROR);
+      payrollResultArea.setText(validationException.getMessage());
+    } catch (Exception unexpectedException) {
+      showErrorDialog("Something went wrong. Please try again.");
     }
+  }
 
-    public static void setupGUI() {
-        JFrame frame = new JFrame("MotorPH Employee App");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(620, 430);
-        frame.setLocationRelativeTo(null);
+  /** Clears all payroll tab input and result fields. */
+  private static void clearPayrollTab() {
+    payrollEmployeeIdField.setText("");
+    payCoverageStartField.setText("");
+    payCoverageEndField.setText("");
+    payrollResultArea.setText(AppConstants.HINT_PAYROLL_CLEARED);
+  }
 
-        JLabel titleLabel = new JLabel("MotorPH Employee Payroll", JLabel.CENTER);
-        JLabel instructionLabel = new JLabel("Enter Employee ID:");
+  /** Validates add-employee form and persists the new record. */
+  private static void handleAddNewEmployee() {
+    String newId     = addEmployeeIdField.getText().trim();
+    String newName   = addEmployeeNameField.getText().trim();
+    String newSalary = addBasicSalaryField.getText().trim();
+    String newRate   = addHourlyRateField.getText().trim();
 
-        employeeIdField = new JTextField();
-        computeButton = new JButton("Compute Payroll");
-        resultArea = new JTextArea(12, 45);
-        resultArea.setEditable(false);
-        resultArea.setLineWrap(true);
-        resultArea.setWrapStyleWord(true);
+    try {
+      if (!InputValidator.validateNewEmployeeFields(newId, newName, newSalary, newRate)) {
+        throw new IllegalArgumentException(InputValidator.getLastValidationError());
+      }
 
-        JPanel inputPanel = new JPanel(new GridLayout(2, 2, 8, 8));
-        inputPanel.add(instructionLabel);
-        inputPanel.add(employeeIdField);
-        inputPanel.add(new JLabel(""));
-        inputPanel.add(computeButton);
+      double parsedSalary = Double.parseDouble(newSalary);
+      double parsedRate   = Double.parseDouble(newRate);
 
-        frame.add(titleLabel, BorderLayout.NORTH);
-        frame.add(inputPanel, BorderLayout.CENTER);
-        frame.add(new JScrollPane(resultArea), BorderLayout.SOUTH);
+      EmployeeData.addNewEmployee(newId, newName, parsedSalary, parsedRate);
 
-        computeButton.addActionListener(event -> handleComputeButton());
+      JOptionPane.showMessageDialog(null,
+          "Employee " + newId + " — " + newName + " has been added successfully.",
+          AppConstants.DIALOG_ADDED, JOptionPane.INFORMATION_MESSAGE);
 
-        resultArea.setText("Sample Employee IDs: 10001, 10002, 10003");
-        frame.setVisible(true);
+      clearAddEmployeeFields();
+      refreshAllEmployeesDisplay();
+
+    } catch (IllegalArgumentException validationException) {
+      showWarningDialog(validationException.getMessage(), AppConstants.DIALOG_INPUT_ERROR);
+    } catch (Exception unexpectedException) {
+      showErrorDialog("Something went wrong. Please try again.");
     }
+  }
 
-    private static void handleComputeButton() {
-        String employeeId = employeeIdField.getText().trim();
-        System.out.println("Compute button clicked.");
+  /** Loads an existing employee record into the edit fields. */
+  private static void handleLoadEmployeeForEditing() {
+    String targetEmployeeId = searchEmployeeIdField.getText().trim();
 
-        if (!InputValidator.validateRequiredFields(employeeId)) {
-            resultArea.setText(InputValidator.getErrorMessage());
-            displayResult();
+    try {
+      if (!InputValidator.validateEmployeeIdNotEmpty(targetEmployeeId)) {
+        throw new IllegalArgumentException(InputValidator.getLastValidationError());
+      }
+      if (!InputValidator.validateEmployeeIdExists(targetEmployeeId)) {
+        throw new IllegalArgumentException(InputValidator.getLastValidationError());
+      }
+
+      int    employeeIndex = EmployeeData.findEmployeeIndexById(targetEmployeeId);
+      updateEmployeeNameField.setText(EmployeeData.getEmployeeNameByIndex(employeeIndex));
+      updateBasicSalaryField.setText(
+          String.valueOf(EmployeeData.getBasicSalaryByIndex(employeeIndex)));
+      updateHourlyRateField.setText(
+          String.valueOf(EmployeeData.getHourlyRateByIndex(employeeIndex)));
+      enableEditFields();
+
+      updateStatusArea.setText(
+          "Employee Number " + targetEmployeeId + " loaded.\n"
+          + "Edit the fields above, then click Save Changes or Delete Employee.");
+
+    } catch (IllegalArgumentException validationException) {
+      showWarningDialog(validationException.getMessage(), AppConstants.DIALOG_NOT_FOUND);
+    }
+  }
+
+  /** Validates updated fields and persists changes for the selected employee. */
+  private static void handleSaveEmployeeChanges() {
+    String targetEmployeeId   = searchEmployeeIdField.getText().trim();
+    String updatedName        = updateEmployeeNameField.getText().trim();
+    String updatedSalaryInput = updateBasicSalaryField.getText().trim();
+    String updatedRateInput   = updateHourlyRateField.getText().trim();
+
+    try {
+      if (targetEmployeeId.isEmpty()) {
+        throw new IllegalArgumentException("Please load an employee record first.");
+      }
+      if (!InputValidator.validateUpdateEmployeeFields(
+          updatedName, updatedSalaryInput, updatedRateInput)) {
+        throw new IllegalArgumentException(InputValidator.getLastValidationError());
+      }
+
+      double updatedSalary = Double.parseDouble(updatedSalaryInput);
+      double updatedRate   = Double.parseDouble(updatedRateInput);
+
+      EmployeeData.updateExistingEmployee(
+          targetEmployeeId, updatedName, updatedSalary, updatedRate);
+
+      JOptionPane.showMessageDialog(null,
+          "Employee " + targetEmployeeId + " — " + updatedName + " updated successfully.",
+          AppConstants.DIALOG_UPDATED, JOptionPane.INFORMATION_MESSAGE);
+
+      updateStatusArea.setText(
+          "Updated Employee Number: " + targetEmployeeId
+          + "\n  Name   : " + updatedName
+          + "\n  Salary : PHP " + String.format("%,.2f", updatedSalary)
+          + "\n  Rate   : PHP " + String.format("%,.2f", updatedRate));
+
+    } catch (IllegalArgumentException validationException) {
+      showWarningDialog(validationException.getMessage(), AppConstants.DIALOG_INPUT_ERROR);
+    } catch (Exception unexpectedException) {
+      showErrorDialog("Something went wrong. Please try again.");
+    }
+  }
+
+  /** Confirms with the user and removes the selected employee record. */
+  private static void handleDeleteEmployee() {
+    String targetEmployeeId = searchEmployeeIdField.getText().trim();
+
+    try {
+      if (targetEmployeeId.isEmpty()) {
+        throw new IllegalArgumentException("Please load an employee record first.");
+      }
+      if (!InputValidator.validateEmployeeIdExists(targetEmployeeId)) {
+        throw new IllegalArgumentException(InputValidator.getLastValidationError());
+      }
+
+      int    employeeIndex = EmployeeData.findEmployeeIndexById(targetEmployeeId);
+      String employeeName  = EmployeeData.getEmployeeNameByIndex(employeeIndex);
+
+      int userConfirmation = JOptionPane.showConfirmDialog(null,
+          "You are about to permanently delete:\n\n"
+          + "  Employee Number : " + targetEmployeeId + "\n"
+          + "  Name            : " + employeeName + "\n\n"
+          + "This action cannot be undone. Continue?",
+          AppConstants.DIALOG_CONFIRM_DELETE,
+          JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+      if (userConfirmation == JOptionPane.YES_OPTION) {
+        EmployeeData.deleteEmployeeById(targetEmployeeId);
+
+        JOptionPane.showMessageDialog(null,
+            "Employee " + targetEmployeeId + " — " + employeeName
+            + " has been removed from the records.",
+            AppConstants.DIALOG_DELETED, JOptionPane.INFORMATION_MESSAGE);
+
+        clearUpdateDeleteTab();
+        updateStatusArea.setText(
+            "Employee " + targetEmployeeId + " (" + employeeName + ") has been deleted.");
+      }
+
+    } catch (IllegalArgumentException validationException) {
+      showWarningDialog(validationException.getMessage(), AppConstants.DIALOG_INPUT_ERROR);
+    } catch (Exception unexpectedException) {
+      showErrorDialog("Something went wrong. Please try again.");
+    }
+  }
+
+  /** Computes payroll for all employees and generates the summary report. */
+  private static void handleGeneratePayrollSummary() {
+    try {
+      String[] allEmployeeIds = EmployeeData.getAllEmployeeIds();
+      if (allEmployeeIds.length == 0) {
+        payrollSummaryArea.setText(
+            "No employee records found. Please add employees first.");
+        return;
+      }
+
+      String[] allNames        = new String[allEmployeeIds.length];
+      double[] allGrossPays    = new double[allEmployeeIds.length];
+      double[] allDeductions   = new double[allEmployeeIds.length];
+      double[] allNetPays      = new double[allEmployeeIds.length];
+      double   totalGrossPay   = 0;
+      double   totalDeductions = 0;
+      double   totalNetPay     = 0;
+
+      for (int i = 0; i < allEmployeeIds.length; i++) {
+        int    employeeIndex = EmployeeData.findEmployeeIndexById(allEmployeeIds[i]);
+        double basicSalary   = EmployeeData.getBasicSalaryByIndex(employeeIndex);
+        double hourlyRate    = EmployeeData.getHourlyRateByIndex(employeeIndex);
+        double hoursWorked   = TimeRecordData.computeTotalHoursWorked(allEmployeeIds[i]);
+        double grossPay      = PayrollCalculator.computeGrossPay(hourlyRate, hoursWorked);
+        double deductions    = PayrollCalculator.computeAllDeductions(grossPay, basicSalary);
+        double netPay        = PayrollCalculator.computeNetPay(grossPay, deductions);
+
+        allNames[i]       = EmployeeData.getEmployeeNameByIndex(employeeIndex);
+        allGrossPays[i]   = grossPay;
+        allDeductions[i]  = deductions;
+        allNetPays[i]     = netPay;
+        totalGrossPay    += grossPay;
+        totalDeductions  += deductions;
+        totalNetPay      += netPay;
+      }
+
+      payrollSummaryArea.setText(PayrollReportBuilder.buildPayrollSummaryReport(
+          allEmployeeIds, allNames,
+          allGrossPays, allDeductions, allNetPays,
+          totalGrossPay, totalDeductions, totalNetPay));
+
+    } catch (Exception unexpectedException) {
+      showErrorDialog("Could not generate the summary. Please try again.");
+    }
+  }
+
+  // ── Private UI Helpers ────────────────────────────────────────────────────────
+
+  private static JPanel createTabOuterPanel() {
+    JPanel tabPanel = new JPanel(new BorderLayout(0, AppConstants.PADDING_OUTER / 2));
+    tabPanel.setBackground(AppConstants.COLOR_BACKGROUND);
+    tabPanel.setBorder(BorderFactory.createEmptyBorder(
+        AppConstants.PADDING_OUTER, AppConstants.PADDING_OUTER,
+        AppConstants.PADDING_OUTER, AppConstants.PADDING_OUTER));
+    return tabPanel;
+  }
+
+  private static JPanel createFlowRow() {
+    JPanel flowRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+    flowRow.setBackground(AppConstants.COLOR_SURFACE);
+    return flowRow;
+  }
+
+  private static void refreshAllEmployeesDisplay() {
+    allEmployeesDisplayArea.setText(EmployeeData.buildAllEmployeesDisplayTable());
+  }
+
+  private static void clearAddEmployeeFields() {
+    addEmployeeIdField.setText("");
+    addEmployeeNameField.setText("");
+    addBasicSalaryField.setText("");
+    addHourlyRateField.setText("");
+  }
+
+  private static void clearUpdateDeleteTab() {
+    searchEmployeeIdField.setText("");
+    updateEmployeeNameField.setText("");
+    updateBasicSalaryField.setText("");
+    updateHourlyRateField.setText("");
+    disableEditFields();
+    saveChangesButton.setEnabled(false);
+    deleteEmployeeButton.setEnabled(false);
+  }
+
+  private static void enableEditFields() {
+    updateEmployeeNameField.setEnabled(true);
+    updateBasicSalaryField.setEnabled(true);
+    updateHourlyRateField.setEnabled(true);
+    saveChangesButton.setEnabled(true);
+    deleteEmployeeButton.setEnabled(true);
+  }
+
+  private static void disableEditFields() {
+    updateEmployeeNameField.setEnabled(false);
+    updateBasicSalaryField.setEnabled(false);
+    updateHourlyRateField.setEnabled(false);
+  }
+
+  /**
+   * Returns a DocumentListener that enables targetButton only when
+   * ALL provided fields are non-empty (reusable across multiple forms).
+   */
+  private static DocumentListener buildAllFieldsRequiredListener(
+      JButton targetButton, JTextField... requiredFields) {
+
+    return new DocumentListener() {
+      public void insertUpdate(DocumentEvent e)  { update(); }
+      public void removeUpdate(DocumentEvent e)  { update(); }
+      public void changedUpdate(DocumentEvent e) { update(); }
+
+      private void update() {
+        for (JTextField field : requiredFields) {
+          if (field.getText().trim().isEmpty()) {
+            targetButton.setEnabled(false);
             return;
+          }
         }
+        targetButton.setEnabled(true);
+      }
+    };
+  }
 
-        if (!InputValidator.validateEmployeeId(employeeId)) {
-            resultArea.setText(InputValidator.getErrorMessage());
-            displayResult();
-            return;
-        }
+  private static void showWarningDialog(String message, String title) {
+    JOptionPane.showMessageDialog(null, message, title, JOptionPane.WARNING_MESSAGE);
+  }
 
-        int employeeIndex = EmployeeData.findEmployeeIndex(employeeId);
-        String employeeName = EmployeeData.getEmployeeName(employeeIndex);
-        double basicSalary = EmployeeData.getBasicSalary(employeeIndex);
-        double hourlyRate = EmployeeData.getHourlyRate(employeeIndex);
-        double hoursWorked = TimeRecordData.getHoursWorked(employeeId);
-        double grossPay = PayrollCalculator.computeGrossPay(hourlyRate, hoursWorked);
-        double deductions = PayrollCalculator.computeDeductions(grossPay, basicSalary);
-        double netPay = PayrollCalculator.computeNetPay(grossPay, deductions);
+  private static void showErrorDialog(String message) {
+    JOptionPane.showMessageDialog(null, message,
+        AppConstants.DIALOG_ERROR, JOptionPane.ERROR_MESSAGE);
+  }
 
-        String output = "Employee ID: " + employeeId
-                + "\nEmployee Name: " + employeeName
-                + "\nBasic Salary: PHP " + String.format("%.2f", basicSalary)
-                + "\nHourly Rate: PHP " + String.format("%.2f", hourlyRate)
-                + "\nHours Worked: " + String.format("%.2f", hoursWorked)
-                + "\n\nGross Pay: PHP " + String.format("%.2f", grossPay)
-                + "\n\nDeductions from CP1 MotorPH Formula:"
-                + "\nSSS: PHP " + String.format("%.2f", PayrollCalculator.getSSSContribution())
-                + "\nPhilHealth: PHP " + String.format("%.2f", PayrollCalculator.getPhilHealthContribution())
-                + "\nPag-IBIG: PHP " + String.format("%.2f", PayrollCalculator.getPagIbigContribution())
-                + "\nWithholding Tax: PHP " + String.format("%.2f", PayrollCalculator.getWithholdingTax())
-                + "\nTotal Deductions: PHP " + String.format("%.2f", deductions)
-                + "\nNet Pay: PHP " + String.format("%.2f", netPay)
-                + "\n\nAttendance Summary:\n" + TimeRecordData.getAttendanceSummary(employeeId);
-
-        resultArea.setText(output);
-        displayResult();
-    }
-
-    private static void displayResult() {
-        System.out.println("Current output:");
-        System.out.println(resultArea.getText());
-    }
+  private static void applySystemLookAndFeel() {
+    try {
+      UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+    } catch (Exception ignored) {}
+  }
 }
