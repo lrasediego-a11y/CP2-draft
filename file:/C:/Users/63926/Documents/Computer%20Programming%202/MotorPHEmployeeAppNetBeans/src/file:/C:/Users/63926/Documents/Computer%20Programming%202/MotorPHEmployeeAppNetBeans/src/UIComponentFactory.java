@@ -1,0 +1,169 @@
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.awt.event.*;
+
+/**
+ * UIComponentFactory
+ *
+ * Factory class that produces consistently styled Swing components
+ * for the MotorPH Employee App.
+ *
+ * Centralizes all component creation logic so that visual style
+ * is defined once and reused everywhere — zero duplication.
+ * All colors, fonts, and sizes come from AppConstants.
+ */
+public final class UIComponentFactory {
+
+  private UIComponentFactory() {}
+
+  // ── Buttons ─────────────────────────────────────────────────────────────────
+
+  /** Primary action button (blue background, white text). */
+  public static JButton createPrimaryButton(String buttonLabel) {
+    JButton primaryButton = buildStyledButton(buttonLabel,
+        AppConstants.COLOR_PRIMARY, Color.WHITE);
+    attachHoverEffect(primaryButton,
+        AppConstants.COLOR_PRIMARY, AppConstants.COLOR_PRIMARY_DARK);
+    return primaryButton;
+  }
+
+  /** Danger action button (red, used for delete). */
+  public static JButton createDangerButton(String buttonLabel) {
+    return buildStyledButton(buttonLabel, AppConstants.COLOR_DANGER, Color.WHITE);
+  }
+
+  /** Secondary / neutral button (light grey, dark text). */
+  public static JButton createSecondaryButton(String buttonLabel) {
+    return buildStyledButton(buttonLabel,
+        AppConstants.COLOR_SECONDARY, AppConstants.COLOR_PRIMARY_DARK);
+  }
+
+  // ── Text Inputs ─────────────────────────────────────────────────────────────
+
+  /** Standard text field with branded border and body font. */
+  public static JTextField createStyledTextField(int columnWidth) {
+    JTextField styledField = new JTextField(columnWidth);
+    styledField.setFont(AppConstants.FONT_BODY);
+    styledField.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(AppConstants.COLOR_BORDER),
+        BorderFactory.createEmptyBorder(4, 6, 4, 6)));
+    return styledField;
+  }
+
+  // ── Text Areas ──────────────────────────────────────────────────────────────
+
+  /** Read-only monospaced result / display area. */
+  public static JTextArea createReadOnlyResultArea(int rowCount) {
+    JTextArea resultArea = new JTextArea(rowCount, 55);
+    resultArea.setEditable(false);
+    resultArea.setFont(AppConstants.FONT_MONO);
+    resultArea.setBackground(AppConstants.COLOR_RESULT_BG);
+    resultArea.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+    resultArea.setLineWrap(true);
+    resultArea.setWrapStyleWord(true);
+    return resultArea;
+  }
+
+  // ── Labels ──────────────────────────────────────────────────────────────────
+
+  /** Bold label for field names. */
+  public static JLabel createFieldLabel(String labelText) {
+    JLabel fieldLabel = new JLabel(labelText);
+    fieldLabel.setFont(AppConstants.FONT_LABEL);
+    fieldLabel.setForeground(AppConstants.COLOR_TEXT_PRIMARY);
+    fieldLabel.setPreferredSize(new Dimension(AppConstants.LABEL_WIDTH, 26));
+    return fieldLabel;
+  }
+
+  /** Small italic hint / instruction label. */
+  public static JLabel createHintLabel(String hintText) {
+    JLabel hintLabel = new JLabel(hintText);
+    hintLabel.setFont(AppConstants.FONT_HINT);
+    hintLabel.setForeground(AppConstants.COLOR_TEXT_MUTED);
+    hintLabel.setBorder(BorderFactory.createEmptyBorder(4, 2, 0, 0));
+    return hintLabel;
+  }
+
+  // ── Panels ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Creates a titled section panel with a branded border.
+   * Uses BoxLayout (Y_AXIS) for stacking inner components vertically.
+   */
+  public static JPanel createSectionPanel(String sectionTitle) {
+    JPanel sectionPanel = new JPanel();
+    sectionPanel.setLayout(new BoxLayout(sectionPanel, BoxLayout.Y_AXIS));
+    sectionPanel.setBackground(AppConstants.COLOR_SURFACE);
+    sectionPanel.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(AppConstants.COLOR_BORDER, 1),
+            "  " + sectionTitle + "  ",
+            TitledBorder.LEFT, TitledBorder.TOP,
+            AppConstants.FONT_SECTION,
+            AppConstants.COLOR_PRIMARY),
+        BorderFactory.createEmptyBorder(8, 10, 10, 10)));
+    return sectionPanel;
+  }
+
+  /**
+   * Creates a row panel pairing a label and a text field.
+   * Used for form layouts in the Add and Update / Delete tabs.
+   */
+  public static JPanel createLabeledFieldRow(String labelText, JTextField inputField) {
+    JPanel fieldRow = new JPanel(new BorderLayout(8, 0));
+    fieldRow.setBackground(AppConstants.COLOR_SURFACE);
+    fieldRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+    fieldRow.add(createFieldLabel(labelText), BorderLayout.WEST);
+    fieldRow.add(inputField, BorderLayout.CENTER);
+    return fieldRow;
+  }
+
+  /** Creates the branded blue header banner shown at the top of the main window. */
+  public static JPanel createAppHeaderBanner() {
+    JPanel headerBanner = new JPanel(new BorderLayout());
+    headerBanner.setBackground(AppConstants.COLOR_PRIMARY);
+    headerBanner.setBorder(BorderFactory.createEmptyBorder(12, 18, 12, 18));
+
+    JLabel appTitleLabel = new JLabel(AppConstants.APP_TITLE);
+    appTitleLabel.setFont(AppConstants.FONT_HEADER);
+    appTitleLabel.setForeground(Color.WHITE);
+
+    JLabel appSubtitleLabel = new JLabel(AppConstants.APP_SUBTITLE);
+    appSubtitleLabel.setFont(AppConstants.FONT_SUBTEXT);
+    appSubtitleLabel.setForeground(new Color(200, 220, 255));
+
+    headerBanner.add(appTitleLabel, BorderLayout.WEST);
+    headerBanner.add(appSubtitleLabel, BorderLayout.EAST);
+    return headerBanner;
+  }
+
+  // ── Private Helpers ─────────────────────────────────────────────────────────
+
+  private static JButton buildStyledButton(
+      String buttonLabel, Color backgroundColor, Color textColor) {
+
+    JButton styledButton = new JButton(buttonLabel);
+    styledButton.setBackground(backgroundColor);
+    styledButton.setForeground(textColor);
+    styledButton.setFont(AppConstants.FONT_LABEL);
+    styledButton.setFocusPainted(false);
+    styledButton.setBorderPainted(false);
+    styledButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    styledButton.setBorder(BorderFactory.createEmptyBorder(
+        AppConstants.PADDING_BUTTON_V, AppConstants.PADDING_BUTTON_H,
+        AppConstants.PADDING_BUTTON_V, AppConstants.PADDING_BUTTON_H));
+    return styledButton;
+  }
+
+  private static void attachHoverEffect(
+      JButton targetButton, Color normalColor, Color hoverColor) {
+
+    targetButton.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseEntered(MouseEvent e) { targetButton.setBackground(hoverColor); }
+      @Override
+      public void mouseExited(MouseEvent e)  { targetButton.setBackground(normalColor); }
+    });
+  }
+}
