@@ -1,46 +1,181 @@
+import java.util.ArrayList;
+
+/**
+ * EmployeeData
+ *
+ * Data layer for employee records. Manages the in-memory employee dataset
+ * using parallel ArrayLists for IDs, names, salaries, and hourly rates.
+ * All data access goes through this class (single responsibility).
+ * Uses constants from AppConstants to avoid hard-coded values.
+ */
 public class EmployeeData {
-    private static String[] employeeIds = {"10001", "10002", "10003"};
-    private static String[] employeeNames = {"Jose Garcia", "Maria Santos", "Anthony Sediego"};
-    private static double[] basicSalaries = {90000.00, 82500.00, 97500.00};
-    private static double[] hourlyRates = {535.71, 491.07, 580.36};
 
-    public static int findEmployeeIndex(String employeeId) {
-        for (int index = 0; index < employeeIds.length; index++) {
-            if (employeeIds[index].equals(employeeId)) {
-                System.out.println("Employee found at index " + index);
-                return index;
-            }
-        }
+  private static final ArrayList<String> employeeIdList    = new ArrayList<>();
+  private static final ArrayList<String> employeeNameList  = new ArrayList<>();
+  private static final ArrayList<Double> basicSalaryList   = new ArrayList<>();
+  private static final ArrayList<Double> hourlyRateList    = new ArrayList<>();
 
-        System.out.println("Employee was not found.");
-        return -1;
+  static {
+    loadDefaultEmployees();
+  }
+
+  private EmployeeData() {}
+
+  /** Populates the dataset with the default MotorPH employees. */
+  private static void loadDefaultEmployees() {
+    for (int i = 0; i < AppConstants.DEFAULT_EMPLOYEE_IDS.length; i++) {
+      employeeIdList.add(AppConstants.DEFAULT_EMPLOYEE_IDS[i]);
+      employeeNameList.add(AppConstants.DEFAULT_EMPLOYEE_NAMES[i]);
+      basicSalaryList.add(AppConstants.DEFAULT_BASIC_SALARIES[i]);
+      hourlyRateList.add(AppConstants.DEFAULT_HOURLY_RATES[i]);
     }
+  }
 
-    public static String getEmployeeName(int employeeIndex) {
-        if (employeeIndex >= 0 && employeeIndex < employeeNames.length) {
-            return employeeNames[employeeIndex];
-        }
+  // ── Read Operations ─────────────────────────────────────────────────────────
 
-        return "Unknown Employee";
+  /**
+   * Searches for an employee by ID and returns the index.
+   *
+   * @param targetEmployeeId the employee ID to search for
+   * @return the list index, or -1 if not found
+   */
+  public static int findEmployeeIndexById(String targetEmployeeId) {
+    for (int i = 0; i < employeeIdList.size(); i++) {
+      if (employeeIdList.get(i).equals(targetEmployeeId)) {
+        return i;
+      }
     }
+    return -1;
+  }
 
-    public static double getHourlyRate(int employeeIndex) {
-        if (employeeIndex >= 0 && employeeIndex < hourlyRates.length) {
-            return hourlyRates[employeeIndex];
-        }
-
-        return 0.00;
+  public static String getEmployeeNameByIndex(int employeeIndex) {
+    if (isValidIndex(employeeIndex)) {
+      return employeeNameList.get(employeeIndex);
     }
+    return "Unknown Employee";
+  }
 
-    public static double getBasicSalary(int employeeIndex) {
-        if (employeeIndex >= 0 && employeeIndex < basicSalaries.length) {
-            return basicSalaries[employeeIndex];
-        }
-
-        return 0.00;
+  public static double getBasicSalaryByIndex(int employeeIndex) {
+    if (isValidIndex(employeeIndex)) {
+      return basicSalaryList.get(employeeIndex);
     }
+    return 0.00;
+  }
 
-    public static String[] getEmployeeIds() {
-        return employeeIds;
+  public static double getHourlyRateByIndex(int employeeIndex) {
+    if (isValidIndex(employeeIndex)) {
+      return hourlyRateList.get(employeeIndex);
     }
+    return 0.00;
+  }
+
+  public static String[] getAllEmployeeIds() {
+    return employeeIdList.toArray(new String[0]);
+  }
+
+  public static int getTotalEmployeeCount() {
+    return employeeIdList.size();
+  }
+
+  public static boolean doesEmployeeExist(String targetEmployeeId) {
+    return findEmployeeIndexById(targetEmployeeId) != -1;
+  }
+
+  // ── Write Operations (CR02, CR04) ───────────────────────────────────────────
+
+  /**
+   * Adds a new employee record.
+   *
+   * @param newEmployeeId   unique ID for the new employee
+   * @param newEmployeeName full name of the employee
+   * @param newBasicSalary  monthly basic salary in PHP
+   * @param newHourlyRate   computed hourly rate in PHP
+   * @return true if added successfully; false if the ID already exists
+   */
+  public static boolean addNewEmployee(
+      String newEmployeeId,
+      String newEmployeeName,
+      double newBasicSalary,
+      double newHourlyRate) {
+
+    if (doesEmployeeExist(newEmployeeId)) {
+      return false;
+    }
+    employeeIdList.add(newEmployeeId);
+    employeeNameList.add(newEmployeeName);
+    basicSalaryList.add(newBasicSalary);
+    hourlyRateList.add(newHourlyRate);
+    return true;
+  }
+
+  /**
+   * Updates an existing employee's mutable fields (name, salary, rate).
+   *
+   * @param targetEmployeeId   ID of the employee to update
+   * @param updatedName        new employee name
+   * @param updatedBasicSalary updated basic salary
+   * @param updatedHourlyRate  updated hourly rate
+   * @return true if the record was updated; false if the employee was not found
+   */
+  public static boolean updateExistingEmployee(
+      String targetEmployeeId,
+      String updatedName,
+      double updatedBasicSalary,
+      double updatedHourlyRate) {
+
+    int targetIndex = findEmployeeIndexById(targetEmployeeId);
+    if (targetIndex == -1) {
+      return false;
+    }
+    employeeNameList.set(targetIndex, updatedName);
+    basicSalaryList.set(targetIndex, updatedBasicSalary);
+    hourlyRateList.set(targetIndex, updatedHourlyRate);
+    return true;
+  }
+
+  /**
+   * Removes an employee record by ID.
+   *
+   * @param targetEmployeeId ID of the employee to delete
+   * @return true if the record was removed; false if not found
+   */
+  public static boolean deleteEmployeeById(String targetEmployeeId) {
+    int targetIndex = findEmployeeIndexById(targetEmployeeId);
+    if (targetIndex == -1) {
+      return false;
+    }
+    employeeIdList.remove(targetIndex);
+    employeeNameList.remove(targetIndex);
+    basicSalaryList.remove(targetIndex);
+    hourlyRateList.remove(targetIndex);
+    return true;
+  }
+
+  // ── Display Helpers ─────────────────────────────────────────────────────────
+
+  /** Returns a formatted table of all employee records for display. */
+  public static String buildAllEmployeesDisplayTable() {
+    if (employeeIdList.isEmpty()) {
+      return "No employee records found.";
+    }
+    StringBuilder table = new StringBuilder();
+    table.append(String.format("%-8s %-22s %-16s %-12s%n",
+        "ID", "Name", "Basic Salary", "Hourly Rate"));
+    table.append("-".repeat(60)).append("\n");
+
+    for (int i = 0; i < employeeIdList.size(); i++) {
+      table.append(String.format("%-8s %-22s PHP %-12.2f PHP %.2f%n",
+          employeeIdList.get(i),
+          employeeNameList.get(i),
+          basicSalaryList.get(i),
+          hourlyRateList.get(i)));
+    }
+    return table.toString();
+  }
+
+  // ── Private Utilities ───────────────────────────────────────────────────────
+
+  private static boolean isValidIndex(int index) {
+    return index >= 0 && index < employeeIdList.size();
+  }
 }
