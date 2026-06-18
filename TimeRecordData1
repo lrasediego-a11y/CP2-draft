@@ -1,57 +1,143 @@
+/**
+ * TimeRecordData
+ *
+ * Data layer for employee attendance and time records.
+ * Supports filtering hours by pay coverage date range (start to end date).
+ * Uses constants from AppConstants to avoid hard-coded values.
+ */
 public class TimeRecordData {
-    private static String[] employeeIdRecords = {
-            "10001", "10001",
-            "10002", "10002",
-            "10003", "10003"
-    };
 
-    private static String[] dateRecords = {
-            "2026-05-18", "2026-05-19",
-            "2026-05-18", "2026-05-19",
-            "2026-05-18", "2026-05-19"
-    };
+  private static final String[] employeeIdRecords    = AppConstants.DEFAULT_TIME_IDS;
+  private static final String[] attendanceDateRecords = AppConstants.DEFAULT_TIME_DATES;
+  private static final double[] hoursWorkedRecords   = AppConstants.DEFAULT_HOURS_WORKED;
 
-    private static double[] hoursWorkedRecords = {
-            8.0, 7.5,
-            8.0, 8.0,
-            7.0, 8.0
-    };
+  private TimeRecordData() {}
 
-    public static double getHoursWorked(String employeeId) {
-        double totalHours = 0.00;
+  /**
+   * Computes total hours worked for an employee within a pay coverage period.
+   * Only counts records where the date falls on or between startDate and endDate.
+   *
+   * @param targetEmployeeId  the employee ID to look up
+   * @param payCoverageStart  start date of the pay period (YYYY-MM-DD)
+   * @param payCoverageEnd    end date of the pay period (YYYY-MM-DD)
+   * @return total hours worked within the coverage period; 0.0 if none found
+   */
+  public static double computeHoursWorkedInPayPeriod(
+      String targetEmployeeId,
+      String payCoverageStart,
+      String payCoverageEnd) {
 
-        for (int index = 0; index < employeeIdRecords.length; index++) {
-            if (employeeIdRecords[index].equals(employeeId)) {
-                totalHours += hoursWorkedRecords[index];
-            }
-        }
-
-        System.out.println("Total hours worked: " + totalHours);
-        return totalHours;
+    double totalHoursWorked = 0.00;
+    for (int i = 0; i < employeeIdRecords.length; i++) {
+      if (employeeIdRecords[i].equals(targetEmployeeId)
+          && isDateWithinRange(attendanceDateRecords[i], payCoverageStart, payCoverageEnd)) {
+        totalHoursWorked += hoursWorkedRecords[i];
+      }
     }
+    return totalHoursWorked;
+  }
 
-    public static double computeHoursWorked(double timeIn, double timeOut) {
-        if (timeOut < timeIn) {
-            return 0.00;
-        }
-
-        return timeOut - timeIn;
+  /**
+   * Computes total hours worked across ALL records for an employee.
+   * Used when no date filter is applied.
+   *
+   * @param targetEmployeeId the employee ID to look up
+   * @return total hours worked; 0.0 if no records found
+   */
+  public static double computeTotalHoursWorked(String targetEmployeeId) {
+    double totalHoursWorked = 0.00;
+    for (int i = 0; i < employeeIdRecords.length; i++) {
+      if (employeeIdRecords[i].equals(targetEmployeeId)) {
+        totalHoursWorked += hoursWorkedRecords[i];
+      }
     }
+    return totalHoursWorked;
+  }
 
-    public static String getAttendanceSummary(String employeeId) {
-        String summary = "";
-
-        for (int index = 0; index < employeeIdRecords.length; index++) {
-            if (employeeIdRecords[index].equals(employeeId)) {
-                summary += dateRecords[index] + " - "
-                        + hoursWorkedRecords[index] + " hours\n";
-            }
-        }
-
-        if (summary.equals("")) {
-            return "No time records found.";
-        }
-
-        return summary;
+  /**
+   * Calculates hours worked from a time-in / time-out pair.
+   * Returns 0.0 for an invalid range (time-out before time-in).
+   *
+   * @param timeIn  start time as decimal (e.g., 8.0 for 8:00 AM)
+   * @param timeOut end time as decimal (e.g., 17.0 for 5:00 PM)
+   * @return hours worked, or 0.0 for invalid range
+   */
+  public static double calculateHoursFromTimeRange(double timeIn, double timeOut) {
+    if (timeOut < timeIn) {
+      return 0.00;
     }
+    return timeOut - timeIn;
+  }
+
+  /**
+   * Builds a formatted attendance summary filtered by pay coverage period.
+   *
+   * @param targetEmployeeId  the employee ID to summarize
+   * @param payCoverageStart  start date (YYYY-MM-DD)
+   * @param payCoverageEnd    end date (YYYY-MM-DD)
+   * @return formatted date-hours lines, or a "no records" message
+   */
+  public static String buildAttendanceSummaryForPayPeriod(
+      String targetEmployeeId,
+      String payCoverageStart,
+      String payCoverageEnd) {
+
+    StringBuilder attendanceSummary = new StringBuilder();
+    for (int i = 0; i < employeeIdRecords.length; i++) {
+      if (employeeIdRecords[i].equals(targetEmployeeId)
+          && isDateWithinRange(attendanceDateRecords[i], payCoverageStart, payCoverageEnd)) {
+        attendanceSummary
+            .append("    ")
+            .append(attendanceDateRecords[i])
+            .append("  —  ")
+            .append(hoursWorkedRecords[i])
+            .append(" hours\n");
+      }
+    }
+    if (attendanceSummary.length() == 0) {
+      return "    No time records found within the selected pay coverage period.";
+    }
+    return attendanceSummary.toString();
+  }
+
+  /**
+   * Builds a full attendance summary for an employee (no date filter).
+   *
+   * @param targetEmployeeId the employee ID to summarize
+   * @return formatted attendance lines, or a "no records" message
+   */
+  public static String buildAttendanceSummary(String targetEmployeeId) {
+    StringBuilder attendanceSummary = new StringBuilder();
+    for (int i = 0; i < employeeIdRecords.length; i++) {
+      if (employeeIdRecords[i].equals(targetEmployeeId)) {
+        attendanceSummary
+            .append("    ")
+            .append(attendanceDateRecords[i])
+            .append("  —  ")
+            .append(hoursWorkedRecords[i])
+            .append(" hours\n");
+      }
+    }
+    if (attendanceSummary.length() == 0) {
+      return "    No time records found for this employee.";
+    }
+    return attendanceSummary.toString();
+  }
+
+  // ── Private Helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Checks whether a given date string falls within the start–end range.
+   * Comparison is lexicographic (valid for YYYY-MM-DD format).
+   *
+   * @param targetDate  the date to check (YYYY-MM-DD)
+   * @param rangeStart  start of range inclusive (YYYY-MM-DD)
+   * @param rangeEnd    end of range inclusive (YYYY-MM-DD)
+   * @return true if targetDate is within the range
+   */
+  private static boolean isDateWithinRange(
+      String targetDate, String rangeStart, String rangeEnd) {
+    return targetDate.compareTo(rangeStart) >= 0
+        && targetDate.compareTo(rangeEnd) <= 0;
+  }
 }
