@@ -1,9 +1,12 @@
 /**
  * PayrollCalculator
  *
- * Computation layer for all payroll-related calculations.
+ * Computation layer for all payroll-related calculations (Feature 3).
  * Implements CP1 MotorPH formulas for gross pay, SSS, PhilHealth,
  * Pag-IBIG, withholding tax, total deductions, and net pay.
+ *
+ * Uses arrays to store and process multiple employee salary values
+ * for the payroll summary (Feature 3 — Salary Computation).
  *
  * All bracket values and rates are pulled from AppConstants —
  * no magic numbers appear in this class.
@@ -23,29 +26,14 @@ public class PayrollCalculator {
 
   // ── Primary Computation Methods ─────────────────────────────────────────────
 
-  /**
-   * Computes gross pay as hourly rate multiplied by total hours worked.
-   *
-   * @param hourlyRate   employee's hourly rate in PHP
-   * @param hoursWorked  total hours worked in the pay period
-   * @return gross pay in PHP
-   */
   public static double computeGrossPay(double hourlyRate, double hoursWorked) {
     return hourlyRate * hoursWorked;
   }
 
-  /**
-   * Computes all deductions (SSS, PhilHealth, Pag-IBIG, withholding tax)
-   * and stores them for retrieval via getters.
-   *
-   * @param grossPayAmount   computed gross pay for the period
-   * @param basicSalaryAmount employee's monthly basic salary
-   * @return total deductions in PHP
-   */
   public static double computeAllDeductions(double grossPayAmount, double basicSalaryAmount) {
-    lastSssContribution       = computeSssContribution(basicSalaryAmount);
+    lastSssContribution        = computeSssContribution(basicSalaryAmount);
     lastPhilHealthContribution = computePhilHealthContribution(basicSalaryAmount);
-    lastPagIbigContribution   = computePagIbigContribution(basicSalaryAmount);
+    lastPagIbigContribution    = computePagIbigContribution(basicSalaryAmount);
 
     double totalGovernmentContributions =
         lastSssContribution + lastPhilHealthContribution + lastPagIbigContribution;
@@ -57,25 +45,89 @@ public class PayrollCalculator {
     return lastTotalDeductions;
   }
 
-  /**
-   * Computes net pay by subtracting total deductions from gross pay.
-   *
-   * @param grossPayAmount        gross pay for the period
-   * @param totalDeductionsAmount total deductions for the period
-   * @return net pay in PHP
-   */
   public static double computeNetPay(double grossPayAmount, double totalDeductionsAmount) {
     return grossPayAmount - totalDeductionsAmount;
   }
 
-  // ── Government Contribution Formulas (CP1 MotorPH) ─────────────────────────
+  // ── Feature 3: Array-Based Salary Computation ───────────────────────────────
 
   /**
-   * Computes SSS contribution using the MotorPH salary bracket table.
+   * Computes gross pay for all employees and returns the results as an array.
+   * Used in the Summary tab to process all records at once.
    *
-   * @param basicSalaryAmount employee's monthly basic salary
-   * @return SSS contribution in PHP
+   * @param hourlyRates  array of hourly rates, one per employee
+   * @param hoursWorked  array of total hours worked, one per employee
+   * @return array of gross pay values
    */
+  public static double[] computeAllGrossPays(double[] hourlyRates, double[] hoursWorked) {
+    double[] grossPays = new double[hourlyRates.length];
+    for (int i = 0; i < hourlyRates.length; i++) {
+      grossPays[i] = computeGrossPay(hourlyRates[i], hoursWorked[i]);
+    }
+    return grossPays;
+  }
+
+  /**
+   * Computes total deductions for all employees and returns the results as an array.
+   *
+   * @param grossPays     array of gross pay values
+   * @param basicSalaries array of basic salary values
+   * @return array of total deduction values
+   */
+  public static double[] computeAllDeductionsArray(
+      double[] grossPays, double[] basicSalaries) {
+    double[] allDeductions = new double[grossPays.length];
+    for (int i = 0; i < grossPays.length; i++) {
+      allDeductions[i] = computeAllDeductions(grossPays[i], basicSalaries[i]);
+    }
+    return allDeductions;
+  }
+
+  /**
+   * Computes net pay for all employees from gross pay and deductions arrays.
+   *
+   * @param grossPays    array of gross pay values
+   * @param allDeductions array of total deduction values
+   * @return array of net pay values
+   */
+  public static double[] computeAllNetPays(double[] grossPays, double[] allDeductions) {
+    double[] netPays = new double[grossPays.length];
+    for (int i = 0; i < grossPays.length; i++) {
+      netPays[i] = computeNetPay(grossPays[i], allDeductions[i]);
+    }
+    return netPays;
+  }
+
+  /**
+   * Sums all values in a double array.
+   * Used to compute total gross pay, total deductions, total net pay.
+   *
+   * @param values array of numeric values
+   * @return the total sum
+   */
+  public static double computeArrayTotal(double[] values) {
+    double total = 0;
+    for (int i = 0; i < values.length; i++) {
+      total += values[i];
+    }
+    return total;
+  }
+
+  /**
+   * Computes the average of all values in a double array.
+   *
+   * @param values array of numeric values
+   * @return the average, or 0 if the array is empty
+   */
+  public static double computeArrayAverage(double[] values) {
+    if (values.length == 0) {
+      return 0;
+    }
+    return computeArrayTotal(values) / values.length;
+  }
+
+  // ── Government Contribution Formulas ───────────────────────────────────────
+
   public static double computeSssContribution(double basicSalaryAmount) {
     if (basicSalaryAmount < AppConstants.SSS_BRACKET_FLOOR_START) {
       return AppConstants.SSS_MINIMUM_CONTRIBUTION;
@@ -83,9 +135,8 @@ public class PayrollCalculator {
     if (basicSalaryAmount >= AppConstants.SSS_BRACKET_MAX_SALARY) {
       return AppConstants.SSS_MAXIMUM_CONTRIBUTION;
     }
-
-    double bracketFloor       = AppConstants.SSS_BRACKET_FLOOR_START;
-    double bracketCeiling     = AppConstants.SSS_BRACKET_CEILING_START;
+    double bracketFloor        = AppConstants.SSS_BRACKET_FLOOR_START;
+    double bracketCeiling      = AppConstants.SSS_BRACKET_CEILING_START;
     double bracketContribution = AppConstants.SSS_CONTRIBUTION_START;
 
     while (bracketCeiling <= AppConstants.SSS_BRACKET_MAX_SALARY) {
@@ -99,15 +150,8 @@ public class PayrollCalculator {
     return bracketContribution;
   }
 
-  /**
-   * Computes the employee's share of the PhilHealth monthly premium.
-   *
-   * @param basicSalaryAmount employee's monthly basic salary
-   * @return employee share of PhilHealth premium in PHP
-   */
   public static double computePhilHealthContribution(double basicSalaryAmount) {
     double monthlyPremium;
-
     if (basicSalaryAmount < AppConstants.PHILHEALTH_MIN_SALARY) {
       monthlyPremium = AppConstants.PHILHEALTH_MIN_PREMIUM;
     } else if (basicSalaryAmount <= AppConstants.PHILHEALTH_MAX_SALARY) {
@@ -115,16 +159,9 @@ public class PayrollCalculator {
     } else {
       monthlyPremium = AppConstants.PHILHEALTH_MAX_PREMIUM;
     }
-
     return monthlyPremium * AppConstants.PHILHEALTH_EMPLOYEE_SHARE;
   }
 
-  /**
-   * Computes Pag-IBIG contribution (1% or 2% of basic salary, capped).
-   *
-   * @param basicSalaryAmount employee's monthly basic salary
-   * @return Pag-IBIG contribution in PHP
-   */
   public static double computePagIbigContribution(double basicSalaryAmount) {
     double applicableRate =
         (basicSalaryAmount >= AppConstants.PAG_IBIG_SALARY_LOWER
@@ -136,12 +173,6 @@ public class PayrollCalculator {
     return Math.min(computedContribution, AppConstants.PAG_IBIG_MAX_CONTRIBUTION);
   }
 
-  /**
-   * Computes withholding tax based on taxable income brackets.
-   *
-   * @param taxableIncomeAmount income after government contributions
-   * @return withholding tax in PHP
-   */
   public static double computeWithholdingTax(double taxableIncomeAmount) {
     if (taxableIncomeAmount <= AppConstants.TAX_EXEMPT_CEILING) {
       return 0.00;
