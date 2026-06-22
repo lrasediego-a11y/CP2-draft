@@ -1,0 +1,152 @@
+/**
+ * PayrollReportBuilder
+ *
+ * Builds formatted text reports for payroll output and summary display.
+ * Separates report formatting from computation and GUI logic
+ * (single-responsibility principle).
+ *
+ * Updated for MS2 to include Department and Position fields
+ * in both individual and summary reports.
+ */
+public final class PayrollReportBuilder {
+
+  private PayrollReportBuilder() {}
+
+  /**
+   * Builds the full individual payroll result report for one employee.
+   */
+  public static String buildIndividualPayrollReport(
+      String employeeId,
+      String employeeName,
+      String department,
+      String position,
+      String payCoverageStart,
+      String payCoverageEnd,
+      double basicSalary,
+      double hourlyRate,
+      double hoursWorked,
+      double grossPay,
+      double sssContribution,
+      double philHealthContrib,
+      double pagIbigContrib,
+      double withholdingTax,
+      double totalDeductions,
+      double netPay,
+      String attendanceSummary) {
+
+    return "╔══════════════════════════════════════════════════════════════╗\n"
+        + "║         MOTORPH PAYROLL COMPUTATION RESULT                    ║\n"
+        + "╚══════════════════════════════════════════════════════════════╝\n"
+        + formatLabelValue("Employee No.",  employeeId)
+        + formatLabelValue("Employee Name", employeeName)
+        + formatLabelValue("Department",    department)
+        + formatLabelValue("Position",      position)
+        + formatLabelValue("Pay Coverage",
+            payCoverageStart + "  to  " + payCoverageEnd)
+        + formatCurrencyRow("Basic Salary", basicSalary)
+        + formatCurrencyRow("Hourly Rate",  hourlyRate)
+        + String.format("  %-16s: %.2f hours%n", "Hours Worked", hoursWorked)
+        + "  ──────────────────────────────────────────────────────\n"
+        + formatCurrencyRow("Gross Pay",    grossPay)
+        + "  ──────────────────────────────────────────────────────\n"
+        + "  Deductions (CP1 MotorPH Formula)\n"
+        + formatDeductionRow("SSS",              sssContribution)
+        + formatDeductionRow("PhilHealth",        philHealthContrib)
+        + formatDeductionRow("Pag-IBIG",          pagIbigContrib)
+        + formatDeductionRow("Withholding Tax",   withholdingTax)
+        + formatDeductionRow("Total Deductions",  totalDeductions)
+        + "  ══════════════════════════════════════════════════════\n"
+        + formatCurrencyRow("NET PAY",      netPay)
+        + "  ══════════════════════════════════════════════════════\n"
+        + "\n  Attendance Detail:\n"
+        + attendanceSummary;
+  }
+
+  /**
+   * Builds the payroll summary report for all employees (Feature 3).
+   * Uses arrays of computed values passed in from the Summary tab handler.
+   *
+   * @param employeeIds      all employee IDs
+   * @param employeeNames    corresponding names
+   * @param departments      corresponding departments
+   * @param positions        corresponding positions
+   * @param grossPayValues   per-employee gross pay array
+   * @param deductionValues  per-employee total deductions array
+   * @param netPayValues     per-employee net pay array
+   * @param totalGrossPay    sum of all gross pays
+   * @param totalDeductions  sum of all deductions
+   * @param totalNetPay      sum of all net pays
+   * @param averageNetPay    average net pay across all employees
+   * @return formatted summary report string
+   */
+  public static String buildPayrollSummaryReport(
+      String[] employeeIds,
+      String[] employeeNames,
+      String[] departments,
+      String[] positions,
+      double[] grossPayValues,
+      double[] deductionValues,
+      double[] netPayValues,
+      double totalGrossPay,
+      double totalDeductions,
+      double totalNetPay,
+      double averageNetPay) {
+
+    StringBuilder summaryRows = new StringBuilder();
+    summaryRows.append(String.format(
+        "  %-8s %-18s %-12s %-14s %12s %12s %12s%n",
+        "No.", "Name", "Dept", "Position", "Gross Pay", "Deductions", "Net Pay"));
+    summaryRows.append("  ").append("─".repeat(90)).append("\n");
+
+    for (int i = 0; i < employeeIds.length; i++) {
+      summaryRows.append(String.format(
+          "  %-8s %-18s %-12s %-14s %12s %12s %12s%n",
+          employeeIds[i],
+          employeeNames[i],
+          departments[i],
+          positions[i],
+          formatPhp(grossPayValues[i]),
+          formatPhp(deductionValues[i]),
+          formatPhp(netPayValues[i])));
+    }
+
+    summaryRows.append("  ").append("═".repeat(90)).append("\n");
+    summaryRows.append(String.format(
+        "  %-8s %-18s %-12s %-14s %12s %12s %12s%n",
+        "TOTAL",
+        "(" + employeeIds.length + " employees)",
+        "", "",
+        formatPhp(totalGrossPay),
+        formatPhp(totalDeductions),
+        formatPhp(totalNetPay)));
+
+    return "╔══════════════════════════════════════════════════════════════╗\n"
+        + "║             MOTORPH PAYROLL SUMMARY REPORT                    ║\n"
+        + "╚══════════════════════════════════════════════════════════════╝\n\n"
+        + summaryRows
+        + "\n"
+        + String.format("  Total Employees     : %d%n", employeeIds.length)
+        + String.format("  Total Gross Pay     : %s%n", formatPhp(totalGrossPay))
+        + String.format("  Total Deductions    : %s%n", formatPhp(totalDeductions))
+        + String.format("  Total Net Pay       : %s%n", formatPhp(totalNetPay))
+        + String.format("  Average Net Pay     : %s%n", formatPhp(averageNetPay));
+  }
+
+  // ── Private Format Helpers ──────────────────────────────────────────────────
+
+  private static String formatLabelValue(String label, String value) {
+    return String.format("  %-16s: %s%n", label, value);
+  }
+
+  private static String formatCurrencyRow(String label, double amount) {
+    return String.format("  %-16s: PHP %,.2f%n", label, amount);
+  }
+
+  private static String formatDeductionRow(String label, double amount) {
+    return String.format("    %-20s: PHP %,.2f%n", label, amount);
+  }
+
+  private static String formatPhp(double amount) {
+    return String.format("PHP %,.2f", amount);
+  }
+}
