@@ -16,28 +16,15 @@ public class InputValidator {
 
   // ── Employee ID Validators ──────────────────────────────────────────────────
 
-  /**
-   * Checks that the employee ID field is not blank.
-   *
-   * @param employeeId raw input from the Employee Number field
-   * @return true if non-empty; false if blank or null
-   */
   public static boolean validateEmployeeIdNotEmpty(String employeeId) {
     if (employeeId == null || employeeId.trim().isEmpty()) {
-      lastValidationError =
-          "Employee Number is required. Please enter an Employee Number.";
+      lastValidationError = "Employee Number is required. Please enter an Employee Number.";
       return false;
     }
     lastValidationError = "";
     return true;
   }
 
-  /**
-   * Checks that an employee with the given ID exists in the dataset.
-   *
-   * @param employeeId the employee ID to look up
-   * @return true if found; false otherwise
-   */
   public static boolean validateEmployeeIdExists(String employeeId) {
     if (!EmployeeData.doesEmployeeExist(employeeId)) {
       lastValidationError = buildEmployeeNotFoundMessage(employeeId);
@@ -47,12 +34,6 @@ public class InputValidator {
     return true;
   }
 
-  /**
-   * Checks that the given employee ID does not already exist (for new employees).
-   *
-   * @param proposedEmployeeId the new ID to check for uniqueness
-   * @return true if the ID is available; false if already in use
-   */
   public static boolean validateEmployeeIdIsUnique(String proposedEmployeeId) {
     if (EmployeeData.doesEmployeeExist(proposedEmployeeId)) {
       lastValidationError =
@@ -64,15 +45,26 @@ public class InputValidator {
     return true;
   }
 
-  // ── Numeric Field Validators ────────────────────────────────────────────────
+  // ── Text Field Validators ───────────────────────────────────────────────────
 
   /**
-   * Checks that a string can be parsed as a positive number.
+   * Checks that a generic text field (name, department, position) is not blank.
    *
-   * @param fieldLabel  display name of the field (used in error messages)
-   * @param inputValue  raw string to validate
-   * @return true if parseable and positive; false otherwise
+   * @param fieldLabel display name of the field (used in error messages)
+   * @param fieldValue raw input string to validate
+   * @return true if non-empty; false otherwise
    */
+  public static boolean validateTextFieldNotEmpty(String fieldLabel, String fieldValue) {
+    if (fieldValue == null || fieldValue.trim().isEmpty()) {
+      lastValidationError = fieldLabel + " is required.";
+      return false;
+    }
+    lastValidationError = "";
+    return true;
+  }
+
+  // ── Numeric Field Validators ────────────────────────────────────────────────
+
   public static boolean validatePositiveNumericField(String fieldLabel, String inputValue) {
     if (inputValue == null || inputValue.trim().isEmpty()) {
       lastValidationError = fieldLabel + " is required.";
@@ -97,14 +89,6 @@ public class InputValidator {
 
   // ── Date Validators ─────────────────────────────────────────────────────────
 
-  /**
-   * Validates that a date string is non-empty and follows YYYY-MM-DD format
-   * with a plausible month and day range.
-   *
-   * @param fieldLabel display name of the field (used in error messages)
-   * @param dateInput  raw date string to validate
-   * @return true if valid; false otherwise
-   */
   public static boolean validateDateField(String fieldLabel, String dateInput) {
     if (dateInput == null || dateInput.trim().isEmpty()) {
       lastValidationError = fieldLabel + " is required. Use format YYYY-MM-DD.";
@@ -142,17 +126,9 @@ public class InputValidator {
     return true;
   }
 
-  /**
-   * Checks that the pay period start date is not after the end date.
-   *
-   * @param startDate pay period start (YYYY-MM-DD)
-   * @param endDate   pay period end (YYYY-MM-DD)
-   * @return true if start is on or before end; false otherwise
-   */
   public static boolean validatePayPeriodRange(String startDate, String endDate) {
     if (startDate.trim().compareTo(endDate.trim()) > 0) {
-      lastValidationError =
-          "Pay Period Start must be on or before Pay Period End.";
+      lastValidationError = "Pay Period Start must be on or before Pay Period End.";
       return false;
     }
     lastValidationError = "";
@@ -161,14 +137,6 @@ public class InputValidator {
 
   // ── Composite Validators ────────────────────────────────────────────────────
 
-  /**
-   * Validates all fields required to compute payroll for one employee.
-   *
-   * @param employeeId        raw employee number input
-   * @param payCoverageStart  raw start date input
-   * @param payCoverageEnd    raw end date input
-   * @return true if all fields pass; false on first failure
-   */
   public static boolean validatePayrollInputFields(
       String employeeId, String payCoverageStart, String payCoverageEnd) {
 
@@ -181,10 +149,12 @@ public class InputValidator {
   }
 
   /**
-   * Validates all fields required to add a new employee record.
+   * Validates all fields required to add a new employee record (Feature 2).
    *
    * @param newEmployeeId  proposed employee number
    * @param employeeName   full name
+   * @param department     employee's department
+   * @param position       employee's job position
    * @param basicSalaryStr raw salary string
    * @param hourlyRateStr  raw rate string
    * @return true if all fields pass; false on first failure
@@ -192,29 +162,41 @@ public class InputValidator {
   public static boolean validateNewEmployeeFields(
       String newEmployeeId,
       String employeeName,
+      String department,
+      String position,
       String basicSalaryStr,
       String hourlyRateStr) {
 
     if (!validateEmployeeIdNotEmpty(newEmployeeId)) return false;
     if (!validateEmployeeIdIsUnique(newEmployeeId.trim())) return false;
-    if (!validateNameNotEmpty(employeeName)) return false;
+    if (!validateTextFieldNotEmpty(AppConstants.LABEL_EMPLOYEE_NAME, employeeName)) return false;
+    if (!validateTextFieldNotEmpty(AppConstants.LABEL_DEPARTMENT, department)) return false;
+    if (!validateTextFieldNotEmpty(AppConstants.LABEL_POSITION, position)) return false;
     if (!validatePositiveNumericField(AppConstants.LABEL_BASIC_SALARY, basicSalaryStr)) return false;
     if (!validatePositiveNumericField(AppConstants.LABEL_HOURLY_RATE, hourlyRateStr)) return false;
     return true;
   }
 
   /**
-   * Validates fields required to update an existing employee record.
+   * Validates fields required to update an existing employee record (Feature 4).
    *
    * @param updatedName        updated name
+   * @param updatedDepartment  updated department
+   * @param updatedPosition    updated position
    * @param updatedSalaryStr   updated salary string
    * @param updatedRateStr     updated rate string
    * @return true if all fields pass; false on first failure
    */
   public static boolean validateUpdateEmployeeFields(
-      String updatedName, String updatedSalaryStr, String updatedRateStr) {
+      String updatedName,
+      String updatedDepartment,
+      String updatedPosition,
+      String updatedSalaryStr,
+      String updatedRateStr) {
 
-    if (!validateNameNotEmpty(updatedName)) return false;
+    if (!validateTextFieldNotEmpty(AppConstants.LABEL_EMPLOYEE_NAME, updatedName)) return false;
+    if (!validateTextFieldNotEmpty(AppConstants.LABEL_DEPARTMENT, updatedDepartment)) return false;
+    if (!validateTextFieldNotEmpty(AppConstants.LABEL_POSITION, updatedPosition)) return false;
     if (!validatePositiveNumericField(AppConstants.LABEL_BASIC_SALARY, updatedSalaryStr)) return false;
     if (!validatePositiveNumericField(AppConstants.LABEL_HOURLY_RATE, updatedRateStr)) return false;
     return true;
@@ -222,21 +204,11 @@ public class InputValidator {
 
   // ── Error Retrieval ─────────────────────────────────────────────────────────
 
-  /** Returns the most recent validation error message. */
   public static String getLastValidationError() {
     return lastValidationError;
   }
 
   // ── Private Helpers ─────────────────────────────────────────────────────────
-
-  private static boolean validateNameNotEmpty(String employeeName) {
-    if (employeeName == null || employeeName.trim().isEmpty()) {
-      lastValidationError = "Employee Name is required.";
-      return false;
-    }
-    lastValidationError = "";
-    return true;
-  }
 
   private static String buildEmployeeNotFoundMessage(String employeeId) {
     String[] availableIds = EmployeeData.getAllEmployeeIds();
