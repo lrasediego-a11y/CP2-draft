@@ -1,34 +1,111 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 
 /**
  * EmployeeData
  *
- * Data layer for employee records. Manages the in-memory employee dataset
- * using parallel ArrayLists for IDs, names, salaries, and hourly rates.
- * All data access goes through this class (single responsibility).
- * Uses constants from AppConstants to avoid hard-coded values.
+ * Data layer for employee records, now backed by a CSV file (employees.csv)
+ * for persistence across sessions — MPHCR02 / Feature 2.
+ *
+ * Storage model:
+ *   - Parallel ArrayLists hold the in-memory copy of all employee fields.
+ *   - On startup, loadFromCsv() reads employees.csv if it exists;
+ *     otherwise the default dataset is loaded and immediately saved to CSV.
+ *   - Every add/update/delete operation calls saveToCsv() right after,
+ *     so the file always reflects the current in-memory state.
+ *
+ * All file operations use try-with-resources and report failures through
+ * getLastFileError(), which the GUI layer surfaces to the user.
  */
 public class EmployeeData {
 
   private static final ArrayList<String> employeeIdList    = new ArrayList<>();
   private static final ArrayList<String> employeeNameList  = new ArrayList<>();
+  private static final ArrayList<String> departmentList    = new ArrayList<>();
+  private static final ArrayList<String> positionList      = new ArrayList<>();
   private static final ArrayList<Double> basicSalaryList   = new ArrayList<>();
   private static final ArrayList<Double> hourlyRateList    = new ArrayList<>();
 
+  private static String lastFileError = "";
+
   static {
-    loadDefaultEmployees();
+    loadFromCsv();
   }
 
   private EmployeeData() {}
 
-  /** Populates the dataset with the default MotorPH employees. */
-  private static void loadDefaultEmployees() {
-    for (int i = 0; i < AppConstants.DEFAULT_EMPLOYEE_IDS.length; i++) {
-      employeeIdList.add(AppConstants.DEFAULT_EMPLOYEE_IDS[i]);
-      employeeNameList.add(AppConstants.DEFAULT_EMPLOYEE_NAMES[i]);
-      basicSalaryList.add(AppConstants.DEFAULT_BASIC_SALARIES[i]);
-      hourlyRateList.add(AppConstants.DEFAULT_HOURLY_RATES[i]);
+  // ── CSV Load / Save (Feature 2) ──────────────────────────────────────────────
+
+  /**
+   * Loads employee records from employees.csv into memory.
+   * If the file does not exist yet, the default dataset is loaded
+   * and immediately written to a brand-new employees.csv.
+   */
+  public static void loadFromCsv() {
+    File csvFile = new File(AppConstants.EMPLOYEE_CSV_FILE);
+
+    if (!csvFile.exists()) {
+      loadDefaultEmployees();
+      saveToCsv();
+      return;
     }
+
+    clearAllLists();
+
+    try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+      String line;
+      boolean isFirstLine = true;
+
+      while ((line = reader.readLine()) != null) {
+        if (isFirstLine) {
+          isFirstLine = false;
+          continue; // skip header row
+        }
+        if (line.trim().isEmpty()) {
+          continue;
+        }
+        parseAndAddCsvRow(line);
+      }
+      lastFileError = "";
+
+    } catch (IOException ioException) {
+      lastFileError = "Could not read employees.csv: " + ioException.getMessage();
+      if (employeeIdList.isEmpty()) {
+        loadDefaultEmployees();
+      }
+    }
+  }
+
+  /**
+   * Saves the current in-memory employee records to employees.csv,
+   * overwriting the file with the latest data.
+   *
+   * @return true if the save succeeded; false if a file error occurred
+   */
+  public static boolean saveToCsv() {
+    try (PrintWriter writer = new PrintWriter(new FileWriter(AppConstants.EMPLOYEE_CSV_FILE))) {
+      writer.println(AppConstants.CSV_HEADER_ROW);
+
+      for (int i = 0; i < employeeIdList.size(); i++) {
+        writer.println(buildCsvRow(i));
+      }
+      lastFileError = "";
+      return true;
+
+    } catch (IOException ioException) {
+      lastFileError = "Could not save to employees.csv: " + ioException.getMessage();
+      return false;
+    }
+  }
+
+  /** Returns the most recent file operation error, or an empty string if none. */
+  public static String getLastFileError() {
+    return lastFileError;
   }
 
   // ── Read Operations ─────────────────────────────────────────────────────────
@@ -49,24 +126,23 @@ public class EmployeeData {
   }
 
   public static String getEmployeeNameByIndex(int employeeIndex) {
-    if (isValidIndex(employeeIndex)) {
-      return employeeNameList.get(employeeIndex);
-    }
-    return "Unknown Employee";
+    return isValidIndex(employeeIndex) ? employeeNameList.get(employeeIndex) : "Unknown Employee";
+  }
+
+  public static String getDepartmentByIndex(int employeeIndex) {
+    return isValidIndex(employeeIndex) ? departmentList.get(employeeIndex) : "";
+  }
+
+  public static String getPositionByIndex(int employeeIndex) {
+    return isValidIndex(employeeIndex) ? positionList.get(employeeIndex) : "";
   }
 
   public static double getBasicSalaryByIndex(int employeeIndex) {
-    if (isValidIndex(employeeIndex)) {
-      return basicSalaryList.get(employeeIndex);
-    }
-    return 0.00;
+    return isValidIndex(employeeIndex) ? basicSalaryList.get(employeeIndex) : 0.00;
   }
 
   public static double getHourlyRateByIndex(int employeeIndex) {
-    if (isValidIndex(employeeIndex)) {
-      return hourlyRateList.get(employeeIndex);
-    }
-    return 0.00;
+    return isValidIndex(employeeIndex) ? hourlyRateList.get(employeeIndex) : 0.00;
   }
 
   public static String[] getAllEmployeeIds() {
@@ -81,20 +157,19 @@ public class EmployeeData {
     return findEmployeeIndexById(targetEmployeeId) != -1;
   }
 
-  // ── Write Operations (CR02, CR04) ───────────────────────────────────────────
+  // ── Write Operations (CR02 Add, CR04 Update/Delete) ─────────────────────────
 
   /**
-   * Adds a new employee record.
+   * Adds a new employee record and immediately persists it to CSV.
    *
-   * @param newEmployeeId   unique ID for the new employee
-   * @param newEmployeeName full name of the employee
-   * @param newBasicSalary  monthly basic salary in PHP
-   * @param newHourlyRate   computed hourly rate in PHP
-   * @return true if added successfully; false if the ID already exists
+   * @return true if added and saved successfully; false if the ID already
+   *         exists or the CSV save failed
    */
   public static boolean addNewEmployee(
       String newEmployeeId,
       String newEmployeeName,
+      String newDepartment,
+      String newPosition,
       double newBasicSalary,
       double newHourlyRate) {
 
@@ -103,23 +178,25 @@ public class EmployeeData {
     }
     employeeIdList.add(newEmployeeId);
     employeeNameList.add(newEmployeeName);
+    departmentList.add(newDepartment);
+    positionList.add(newPosition);
     basicSalaryList.add(newBasicSalary);
     hourlyRateList.add(newHourlyRate);
-    return true;
+
+    return saveToCsv();
   }
 
   /**
-   * Updates an existing employee's mutable fields (name, salary, rate).
+   * Updates an existing employee's mutable fields and persists to CSV.
    *
-   * @param targetEmployeeId   ID of the employee to update
-   * @param updatedName        new employee name
-   * @param updatedBasicSalary updated basic salary
-   * @param updatedHourlyRate  updated hourly rate
-   * @return true if the record was updated; false if the employee was not found
+   * @return true if updated and saved; false if the employee was not found
+   *         or the CSV save failed
    */
   public static boolean updateExistingEmployee(
       String targetEmployeeId,
       String updatedName,
+      String updatedDepartment,
+      String updatedPosition,
       double updatedBasicSalary,
       double updatedHourlyRate) {
 
@@ -128,16 +205,18 @@ public class EmployeeData {
       return false;
     }
     employeeNameList.set(targetIndex, updatedName);
+    departmentList.set(targetIndex, updatedDepartment);
+    positionList.set(targetIndex, updatedPosition);
     basicSalaryList.set(targetIndex, updatedBasicSalary);
     hourlyRateList.set(targetIndex, updatedHourlyRate);
-    return true;
+
+    return saveToCsv();
   }
 
   /**
-   * Removes an employee record by ID.
+   * Removes an employee record by ID and persists the change to CSV.
    *
-   * @param targetEmployeeId ID of the employee to delete
-   * @return true if the record was removed; false if not found
+   * @return true if removed and saved; false if not found or save failed
    */
   public static boolean deleteEmployeeById(String targetEmployeeId) {
     int targetIndex = findEmployeeIndexById(targetEmployeeId);
@@ -146,9 +225,12 @@ public class EmployeeData {
     }
     employeeIdList.remove(targetIndex);
     employeeNameList.remove(targetIndex);
+    departmentList.remove(targetIndex);
+    positionList.remove(targetIndex);
     basicSalaryList.remove(targetIndex);
     hourlyRateList.remove(targetIndex);
-    return true;
+
+    return saveToCsv();
   }
 
   // ── Display Helpers ─────────────────────────────────────────────────────────
@@ -159,23 +241,75 @@ public class EmployeeData {
       return "No employee records found.";
     }
     StringBuilder table = new StringBuilder();
-    table.append(String.format("%-8s %-22s %-16s %-12s%n",
-        "ID", "Name", "Basic Salary", "Hourly Rate"));
-    table.append("-".repeat(60)).append("\n");
+    table.append(String.format("%-8s %-18s %-12s %-16s %-14s %-12s%n",
+        "ID", "Name", "Department", "Position", "Basic Salary", "Hourly Rate"));
+    table.append("-".repeat(85)).append("\n");
 
     for (int i = 0; i < employeeIdList.size(); i++) {
-      table.append(String.format("%-8s %-22s PHP %-12.2f PHP %.2f%n",
+      table.append(String.format("%-8s %-18s %-12s %-16s PHP %-10.2f PHP %.2f%n",
           employeeIdList.get(i),
           employeeNameList.get(i),
+          departmentList.get(i),
+          positionList.get(i),
           basicSalaryList.get(i),
           hourlyRateList.get(i)));
     }
     return table.toString();
   }
 
-  // ── Private Utilities ───────────────────────────────────────────────────────
+  // ── Private Helpers ─────────────────────────────────────────────────────────
 
   private static boolean isValidIndex(int index) {
     return index >= 0 && index < employeeIdList.size();
+  }
+
+  private static void clearAllLists() {
+    employeeIdList.clear();
+    employeeNameList.clear();
+    departmentList.clear();
+    positionList.clear();
+    basicSalaryList.clear();
+    hourlyRateList.clear();
+  }
+
+  /** Builds one CSV row string for the employee at the given index. */
+  private static String buildCsvRow(int index) {
+    return employeeIdList.get(index) + ","
+        + employeeNameList.get(index) + ","
+        + departmentList.get(index) + ","
+        + positionList.get(index) + ","
+        + basicSalaryList.get(index) + ","
+        + hourlyRateList.get(index);
+  }
+
+  /** Parses one CSV line and appends the parsed fields to the in-memory lists. */
+  private static void parseAndAddCsvRow(String csvLine) {
+    String[] fields = csvLine.split(",");
+    if (fields.length < AppConstants.CSV_COLUMN_COUNT) {
+      return; // skip malformed row rather than crash
+    }
+    try {
+      employeeIdList.add(fields[AppConstants.CSV_INDEX_ID].trim());
+      employeeNameList.add(fields[AppConstants.CSV_INDEX_NAME].trim());
+      departmentList.add(fields[AppConstants.CSV_INDEX_DEPT].trim());
+      positionList.add(fields[AppConstants.CSV_INDEX_POSITION].trim());
+      basicSalaryList.add(Double.parseDouble(fields[AppConstants.CSV_INDEX_SALARY].trim()));
+      hourlyRateList.add(Double.parseDouble(fields[AppConstants.CSV_INDEX_RATE].trim()));
+    } catch (NumberFormatException numberFormatException) {
+      // Skip rows with corrupted numeric fields rather than crashing the app
+    }
+  }
+
+  /** Populates the in-memory lists with the default MotorPH employees. */
+  private static void loadDefaultEmployees() {
+    clearAllLists();
+    for (int i = 0; i < AppConstants.DEFAULT_EMPLOYEE_IDS.length; i++) {
+      employeeIdList.add(AppConstants.DEFAULT_EMPLOYEE_IDS[i]);
+      employeeNameList.add(AppConstants.DEFAULT_EMPLOYEE_NAMES[i]);
+      departmentList.add(AppConstants.DEFAULT_DEPARTMENTS[i]);
+      positionList.add(AppConstants.DEFAULT_POSITIONS[i]);
+      basicSalaryList.add(AppConstants.DEFAULT_BASIC_SALARIES[i]);
+      hourlyRateList.add(AppConstants.DEFAULT_HOURLY_RATES[i]);
+    }
   }
 }
